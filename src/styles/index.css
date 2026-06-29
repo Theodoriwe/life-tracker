@@ -1,0 +1,125 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+html,
+body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Shimmer text for swipe hint */
+.shimmer-text {
+  color: #6F6F7F; /* visible fallback color when shimmer is inactive */
+  display: inline-block;
+  opacity: 1;
+}
+
+@keyframes shimmer-slide {
+  0% { background-position: 300% 0; }
+  100% { background-position: -300% 0; }
+}
+
+/* Activate animation only when parent has .shimmer-active to keep all hints synchronized.
+   Use a pseudo-element overlay so the base text color never becomes transparent. */
+.shimmer-text { position: relative; }
+
+/* Per-letter shimmer: each character animates individually (no overlay) */
+.shimmer-letters { display: inline-block; line-height: 1; }
+.shimmer-letters .shimmer-char {
+  color: #6F6F7F;
+  display: inline-block;
+  will-change: color, text-shadow;
+}
+
+/* Triggered when root has .shimmer-active: each char animates with staggered delay */
+.shimmer-active .shimmer-letters .shimmer-char {
+  animation-name: char-shimmer;
+  animation-duration: 1000ms;
+  animation-fill-mode: both;
+  animation-timing-function: ease-out;
+  animation-iteration-count: 1;
+  animation-delay: calc(var(--i) * 80ms);
+}
+
+@keyframes char-shimmer {
+  0% { color: #6F6F7F; text-shadow: none; }
+  45% { color: #c1c4c7; text-shadow: 0 2px 4px rgba(255,255,255,0.10); }
+  100% { color: #6F6F7F; text-shadow: none; }
+}
+
+/* Notebook grid background for task cards */
+.notebook-grid {
+  position: relative;
+}
+
+/* Use an overlay pseudo-element so the grid is always visible above the card background */
+.notebook-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(to bottom, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 28px),
+    linear-gradient(to right, rgba(0,0,0,0.04) 0px, rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: 100% 28px, 48px 100%;
+  background-position: 0 0, 40px 0;
+  background-repeat: repeat, repeat;
+  opacity: 0.9;
+  mix-blend-mode: normal;
+}
+
+/* Gel-pen ink color for primary task text inside notebook cards */
+.notebook-grid p.text-\[14px\],
+.notebook-grid span.text-\[13px\],
+.notebook-grid p.text-\[12px\],
+.notebook-grid span.text-\[11px\] {
+  color: #0b3d91 !important;
+}
+
+/* Slight ink texture: subtle shadow to mimic gel thickness */
+.notebook-grid p.text-\[14px\],
+.notebook-grid span.text-\[13px\] {
+  text-shadow: 0 0 0.6px rgba(11,61,145,0.18);
+}
+
+/* Force rounded corners for slider track and range */
+[data-slot="slider-track"] {
+  border-radius: 9999px !important;
+  overflow: hidden !important;
+  background-clip: padding-box !important;
+}
+
+[data-slot="slider-range"] {
+  border-radius: 9999px !important;
+  left: 0 !important;
+  top: 0 !important;
+}
+
+
+/* Ensure badge text is white (override previous notebook ink rules) */
+.notebook-grid .task-badge p,
+.notebook-grid .task-badge span,
+.notebook-grid .task-badge .shimmer-char {
+  color: #ffffff !important;
+  text-shadow: none !important;
+}
