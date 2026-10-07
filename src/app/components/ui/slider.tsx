@@ -23,8 +23,9 @@ function Slider({
   max = 100,
   style,
   hint,
+  allowTrackClick = false,
   ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root> & { style?: React.CSSProperties; hint?: React.ReactNode }) {
+}: React.ComponentProps<typeof SliderPrimitive.Root> & { style?: React.CSSProperties; hint?: React.ReactNode; allowTrackClick?: boolean }) {
   const _values = React.useMemo(
     () =>
       Array.isArray(value)
@@ -64,6 +65,18 @@ function Slider({
       <SliderPrimitive.Track
         data-slot="slider-track"
         className="relative grow w-full"
+        onPointerDown={(event) => {
+          if (!allowTrackClick) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
+        onClick={(event) => {
+          if (!allowTrackClick) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
         style={{
           height: trackHeight,
           backgroundColor: hexToRgba(sliderColor, 0.12),

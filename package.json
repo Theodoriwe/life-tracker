@@ -2,15 +2,13 @@
   "name": "@figma/my-make-file",
   "private": true,
   "version": "0.0.1",
-  "version": "0.0.1",
-"homepage": "https://Theodoriwe.github.io/life-tracker",
+  "homepage": "https://Theodoriwe.github.io/life-tracker",
   "type": "module",
-"scripts": {
-  "dev": "vite",
-  "build": "vite build",
-  "deploy": "gh-pages -d dist"
-},
-
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "deploy": "gh-pages -d dist"
+  },
   "dependencies": {
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
@@ -44,6 +42,8 @@
     "@radix-ui/react-toggle-group": "1.1.2",
     "@radix-ui/react-tooltip": "1.1.8",
     "@rollup/rollup-win32-x64-msvc": "^4.62.2",
+    "@supabase/supabase-js": "^2.108.2",
+    "@tma.js/sdk": "^3.2.3",
     "canvas-confetti": "1.9.4",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
