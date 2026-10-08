@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { AreaChart, Area, Bar, BarChart, CartesianGrid, Cell, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { ArrowUpRight, BarChart3, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Flame, Heart, MoreHorizontal, Pencil, Pill as PillIcon, Plus, Sparkles, Target, Trash2, TrendingUp, Undo2, Utensils, X } from "lucide-react";
+import { ArrowUpRight, BarChart3, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Flame, Heart, Keyboard, MoreHorizontal, Pencil, Pill as PillIcon, Plus, Sparkles, Target, Trash2, TrendingUp, Undo2, Utensils, X } from "lucide-react";
 import { Slider } from "./components/ui/slider";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "./components/ui/chart";
 import { supabase } from "../lib/supabase";
@@ -4532,6 +4532,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [telegramUserId, setTelegramUserId] = useState<number | null>(null);
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const saveTimeout = useRef<number | null>(null);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   
@@ -4541,6 +4542,7 @@ export default function App() {
 
 // 1. Инициализация Telegram SDK и получение ID
 useEffect(() => {
+  let cancelled = false;
   const tg = (window as any).Telegram?.WebApp;
   addLog(`[TMA] SDK: ${tg ? "найден" : "НЕ НАЙДЕН"}`);  // ✅
   if (tg) {
@@ -4558,19 +4560,29 @@ useEffect(() => {
       addLog(`[TMA] Не удалось отключить свайпы: ${error}`);
     }
   }
-  const id = tg?.initDataUnsafe?.user?.id ? Number(tg.initDataUnsafe.user.id) : null;
-  addLog(`[TMA] User ID: ${id ? "получен" : "не получен"}`);
-  if (!id) {
-    addLog(`[TMA] ⚠️ ID пользователя не получен`);  // ✅
-    setIsInitialLoadDone(true);
-    return;
-  }
-  setTelegramUserId(id);
+  resolveTelegramUserId().then(id => {
+    if (cancelled) return;
+    addLog(`[TMA] User ID: ${id ? "получен" : "не получен"}`);
+    if (!id) {
+      addLog("[Sync] Открыто вне Telegram — данные сохраняются только на этом устройстве");
+      setSyncNotice("Открой приложение через Telegram, чтобы синхронизировать данные между устройствами.");
+      setIsInitialLoadDone(true);
+      return;
+    }
+    if (!supabase) {
+      addLog("[Sync] Не заданы VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY");
+      setSyncNotice("Облачная синхронизация не настроена. Данные пока хранятся только на этом устройстве.");
+      setIsInitialLoadDone(true);
+    }
+    setTelegramUserId(id);
+  });
+  return () => { cancelled = true; };
 }, []);
 
 /// 2. Первичная загрузка данных из Supabase
 useEffect(() => {
   if (!telegramUserId) return;
+  if (!supabase) return;
   let cancelled = false;
 
   async function loadRemote() {
@@ -4578,8 +4590,10 @@ useEffect(() => {
     let remote: AppData | null;
     try {
       remote = await supabaseLoadData(telegramUserId);
-    } catch {
+    } catch (error) {
       // Keep sync disabled after a failed read so local data cannot overwrite cloud data.
+      addLog(`[Sync] Ошибка чтения Supabase: ${error}`);
+      setSyncNotice("Не удалось загрузить облачные данные. Проверь доступ Supabase и таблицу users; локальные данные не отправлены.");
       return;
     }
     if (cancelled) return;
@@ -4620,6 +4634,7 @@ useEffect(() => {
     }
     
     setIsInitialLoadDone(true);
+    setSyncNotice(null);
     addLog(`[Sync] ✅ Первичная загрузка завершена`);
   }
   
@@ -4633,7 +4648,7 @@ useEffect(() => {
 // 3. Сохранение данных
 useEffect(() => {
   saveData(data);
-  if (!telegramUserId || !isInitialLoadDone) {
+  if (!telegramUserId || !isInitialLoadDone || !supabase) {
     addLog(`[Sync] ⏸ Пропуск сохранения: ID=${telegramUserId}, loaded=${isInitialLoadDone}`);  // ✅
     return;
   }
@@ -4645,6 +4660,10 @@ useEffect(() => {
     const snapshot = data;
     saveQueue.current = saveQueue.current
       .then(() => supabaseUpsertData(telegramUserId, snapshot))
+      .then(saved => {
+        if (!saved) setSyncNotice("Не удалось сохранить данные в облако. Проверь доступ Supabase и уникальность telegram_id в таблице users.");
+        else setSyncNotice(null);
+      })
       .then(() => undefined)
       .catch(error => addLog(`[Sync] Ошибка очереди сохранения: ${error}`));
   }, SAVE_DEBOUNCE_MS) as unknown as number;
@@ -4678,6 +4697,7 @@ useEffect(() => {
         className="app-content absolute inset-0 overflow-y-auto overscroll-contain"
         style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}
       >
+        {syncNotice && <div className="sync-notice" role="status">{syncNotice}</div>}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={activeTab}
@@ -4699,8 +4719,57 @@ useEffect(() => {
 {/* Bottom nav */}
 {!showSettings && <BottomNav active={activeTab} onChange={setActiveTab} />}
 
+<KeyboardDismissControl />
+
 </div>
 );
+}
+
+function KeyboardDismissControl() {
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  useEffect(() => {
+    let focusOutTimer = 0;
+    const isEditable = (element: Element | null) => element instanceof HTMLInputElement
+      || element instanceof HTMLTextAreaElement
+      || (element instanceof HTMLElement && element.isContentEditable);
+    const onFocusIn = (event: FocusEvent) => setIsInputFocused(isEditable(event.target as Element | null));
+    const onFocusOut = () => {
+      window.clearTimeout(focusOutTimer);
+      focusOutTimer = window.setTimeout(() => setIsInputFocused(isEditable(document.activeElement)), 0);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isEditable(document.activeElement)) {
+        (document.activeElement as HTMLElement).blur();
+      }
+    };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusOutTimer);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
+  if (!isInputFocused) return null;
+  return (
+    <button
+      type="button"
+      className="keyboard-dismiss"
+      aria-label="Скрыть клавиатуру"
+      onPointerDown={event => {
+        event.preventDefault();
+        (document.activeElement as HTMLElement | null)?.blur();
+        setIsInputFocused(false);
+      }}
+    >
+      <Keyboard size={16} aria-hidden="true" />
+      <span>Готово</span>
+    </button>
+  );
 }
 
 // Helper: render per-character spans with index variable for CSS delay
