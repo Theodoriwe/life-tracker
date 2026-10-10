@@ -13,10 +13,10 @@ select cron.schedule(
   '* * * * *',
   $$
   select net.http_post(
-    url := (select decrypted_secret from vault.decrypted_secrets where name = 'reminders_project_url' order by created_at desc limit 1) || '/functions/v1/telegram-reminders',
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'reminders_project_url') || '/functions/v1/telegram-reminders',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'reminders_cron_secret' order by created_at desc limit 1)
+      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'reminders_cron_secret')
     ),
     body := '{}'::jsonb
   );
