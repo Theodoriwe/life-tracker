@@ -129,6 +129,8 @@ body::-webkit-scrollbar,
   background: #fff;
 }
 
+.telegram-desktop .app-shell { max-width: none; }
+
 .app-nav-brand {
   display: none;
 }
@@ -499,27 +501,6 @@ body::-webkit-scrollbar,
   background: #fff8eb;
   font-size: 12px;
   line-height: 1.45;
-}
-
-.keyboard-dismiss {
-  position: fixed;
-  z-index: 10000;
-  top: calc(env(safe-area-inset-top) + 10px);
-  right: 12px;
-  display: inline-flex;
-  min-height: 40px;
-  align-items: center;
-  gap: 7px;
-  padding: 0 13px;
-  border: 1px solid rgba(30, 41, 59, .1);
-  border-radius: 999px;
-  color: #fff;
-  background: #202b3b;
-  box-shadow: 0 6px 18px rgba(20, 30, 45, .2);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 650;
-  -webkit-tap-highlight-color: transparent;
 }
 
 @media (max-width: 767px) {
@@ -1012,6 +993,16 @@ body::-webkit-scrollbar,
 }
 
 /* Medication tracker */
+.sync-notice { position: relative; z-index: 30; margin: 10px 16px 0; padding: 10px 12px; border: 1px solid rgba(208, 134, 40, .2); border-radius: 12px; color: #714814; background: #fff8eb; font-size: 12px; line-height: 1.45; }
+.telegram-notifications-section { display: flex; flex-direction: column; gap: 10px; padding-top: 2px; border-top: 1px solid #e9edf3; }
+.telegram-notifications-section > p { margin: 0; }
+.notification-setup-hint, .notification-access-status { color: #6d7b8e; font-size: 12px; line-height: 1.5; }
+.notification-server-hint { padding: 10px 12px; border: 1px solid #f0deba; border-radius: 11px; color: #765622; background: #fff9ed; font-size: 12px; line-height: 1.5; }
+.notification-access-button { align-self: flex-start; min-height: 38px; padding: 0 13px; border: 1px solid #cddff5; border-radius: 11px; color: #347dce; background: #f2f7ff; font-size: 12px; font-weight: 650; }
+.notification-settings-list { display: flex; flex-direction: column; gap: 9px; padding-left: 12px; border-left: 2px solid #e0eafa; }
+.notification-time-section { display: flex; flex-direction: column; gap: 8px; }
+.notification-time-field { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px; border: 1px solid #e4eaf2; border-radius: 12px; color: #596981; background: #fff; font-size: 12px; }
+.notification-time-field input, .notification-time-field select { min-width: 112px; max-width: 150px; min-height: 34px; padding: 0 8px; border: 1px solid #e0e7f0; border-radius: 9px; color: #293951; background: #fff; font: inherit; }
 .medications-settings-section { padding-top: 2px; border-top: 1px solid #e9edf3; }
 .medication-feature-toggle { display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid #e4eaf2; border-radius: 16px; background: #f9fbfe; cursor: pointer; }
 .medication-feature-toggle > span { display: flex; flex-direction: column; gap: 4px; }
@@ -2141,47 +2132,5 @@ body::-webkit-scrollbar,
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
-  }
-}
-
-.sync-notice {
-  position: relative;
-  z-index: 30;
-  margin: 10px 16px 0;
-  padding: 10px 12px;
-  border: 1px solid rgba(208, 134, 40, .2);
-  border-radius: 12px;
-  color: #714814;
-  background: #fff8eb;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.keyboard-dismiss {
-  position: fixed;
-  z-index: 10000;
-  top: calc(env(safe-area-inset-top) + 10px);
-  right: 12px;
-  display: inline-flex;
-  min-height: 40px;
-  align-items: center;
-  gap: 7px;
-  padding: 0 13px;
-  border: 1px solid rgba(30, 41, 59, .1);
-  border-radius: 999px;
-  color: #fff;
-  background: #202b3b;
-  box-shadow: 0 6px 18px rgba(20, 30, 45, .2);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 650;
-  -webkit-tap-highlight-color: transparent;
-}
-
-@media (max-width: 767px) {
-  .app-shell input,
-  .app-shell select,
-  .app-shell textarea {
-    font-size: 16px !important;
   }
 }

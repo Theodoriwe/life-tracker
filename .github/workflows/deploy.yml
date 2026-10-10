@@ -32,6 +32,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_TELEGRAM_REMINDERS_READY: ${{ vars.VITE_TELEGRAM_REMINDERS_READY }}
         run: |
           if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
             echo "::warning::Supabase variables are missing. The app will deploy in local-only mode."

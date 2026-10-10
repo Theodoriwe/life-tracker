@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { AreaChart, Area, Bar, BarChart, CartesianGrid, Cell, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { ArrowUpRight, BarChart3, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Flame, Heart, Keyboard, MoreHorizontal, Pencil, Pill as PillIcon, Plus, Sparkles, Target, Trash2, TrendingUp, Undo2, Utensils, X } from "lucide-react";
+import { ArrowUpRight, BarChart3, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Flame, Heart, MoreHorizontal, Pencil, Pill as PillIcon, Plus, Sparkles, Target, Trash2, TrendingUp, Undo2, Utensils, X } from "lucide-react";
 import { Slider } from "./components/ui/slider";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "./components/ui/chart";
 import { supabase } from "../lib/supabase";
@@ -33,6 +33,15 @@ interface Settings {
   carbsGoal: number;
   waterGoal: number;
   medicationsEnabled: boolean;
+  telegramNotificationsEnabled: boolean;
+  medicationRemindersEnabled: boolean;
+  taskRemindersEnabled: boolean;
+  taskReminderIntervalHours: number;
+  startDayMessageEnabled: boolean;
+  startDayMessageTime: string;
+  endDaySummaryEnabled: boolean;
+  endDaySummaryTime: string;
+  notificationTimeZone: string;
 }
 
 interface Medication {
@@ -166,6 +175,15 @@ const DEFAULT_SETTINGS: Settings = {
   carbsGoal: 250,
   waterGoal: 8,
   medicationsEnabled: false,
+  telegramNotificationsEnabled: false,
+  medicationRemindersEnabled: true,
+  taskRemindersEnabled: false,
+  taskReminderIntervalHours: 1,
+  startDayMessageEnabled: false,
+  startDayMessageTime: "08:00",
+  endDaySummaryEnabled: false,
+  endDaySummaryTime: "21:00",
+  notificationTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
 };
 
 const EMPTY_DIARY: DailyDiary = { breakfast: [], lunch: [], dinner: [], snack: [] };
@@ -4279,9 +4297,23 @@ function SettingsScreen({
   const [medications, setMedications] = useState<Medication[]>(data.medications ?? []);
   const [medicationDraft, setMedicationDraft] = useState<MedicationDraft>(createMedicationDraft);
   const [editingMedicationId, setEditingMedicationId] = useState<string | null>(null);
+  const [writeAccessState, setWriteAccessState] = useState<"unknown" | "allowed" | "denied">("unknown");
+
+  const requestTelegramMessages = () => {
+    const tg = (window as any).Telegram?.WebApp;
+    if (typeof tg?.requestWriteAccess !== "function") {
+      setWriteAccessState("denied");
+      return;
+    }
+    tg.requestWriteAccess((allowed: boolean) => setWriteAccessState(allowed ? "allowed" : "denied"));
+  };
 
   const save = () => {
-    setData(prev => ({ ...prev, settings: { ...form }, medications }));
+    setData(prev => ({
+      ...prev,
+      settings: { ...form, notificationTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" },
+      medications,
+    }));
     onClose();
   };
 
@@ -4383,6 +4415,44 @@ function SettingsScreen({
         <section>
           <SectionLabel>Вода</SectionLabel>
           {field("Цель по воде (стаканов)", "waterGoal", "number", "8")}
+        </section>
+
+        <section className="telegram-notifications-section">
+          <SectionLabel>Уведомления в Telegram</SectionLabel>
+          <p className="notification-setup-hint">Откройте чат с вашим ботом и нажмите «Начать», чтобы он мог присылать вам сообщения.</p>
+          {import.meta.env.VITE_TELEGRAM_REMINDERS_READY !== "true" && <p className="notification-server-hint">Доставка сообщений появится после настройки серверных уведомлений в Supabase. Пока можно сохранить расписание.</p>}
+          <button type="button" className="notification-access-button" onClick={requestTelegramMessages}>Разрешить сообщения от бота</button>
+          {writeAccessState === "allowed" && <p className="notification-access-status">Telegram разрешил сообщения.</p>}
+          {writeAccessState === "denied" && <p className="notification-access-status">Откройте приложение в Telegram и разрешите сообщения. Если доступ уже есть, проверьте, что бот не заблокирован.</p>}
+          <label className="medication-feature-toggle">
+            <span><b>Включить уведомления</b><small>Напоминания будут приходить в Telegram</small></span>
+            <input type="checkbox" checked={Boolean(form.telegramNotificationsEnabled)} onChange={event => setForm(current => ({ ...current, telegramNotificationsEnabled: event.target.checked }))} />
+          </label>
+          {form.telegramNotificationsEnabled && <div className="notification-settings-list">
+            <label className="medication-feature-toggle">
+              <span><b>Приём таблеток</b><small>Сообщение в запланированное время</small></span>
+              <input type="checkbox" checked={Boolean(form.medicationRemindersEnabled)} onChange={event => setForm(current => ({ ...current, medicationRemindersEnabled: event.target.checked }))} />
+            </label>
+            <label className="medication-feature-toggle">
+              <span><b>Незавершённые задачи</b><small>Напоминать, пока задачи на сегодня не выполнены</small></span>
+              <input type="checkbox" checked={Boolean(form.taskRemindersEnabled)} onChange={event => setForm(current => ({ ...current, taskRemindersEnabled: event.target.checked }))} />
+            </label>
+            {form.taskRemindersEnabled && <label className="notification-time-field"><span>Повторять каждые</span><select value={form.taskReminderIntervalHours} onChange={event => setForm(current => ({ ...current, taskReminderIntervalHours: Number(event.target.value) }))}>{[1, 2, 3, 4, 6].map(hours => <option value={hours} key={hours}>{hours} {hours === 1 ? "час" : hours < 5 ? "часа" : "часов"}</option>)}</select></label>}
+            <div className="notification-time-section">
+              <label className="medication-feature-toggle">
+                <span><b>План на начало дня</b><small>Задачи на сегодня и короткая сводка</small></span>
+                <input type="checkbox" checked={Boolean(form.startDayMessageEnabled)} onChange={event => setForm(current => ({ ...current, startDayMessageEnabled: event.target.checked }))} />
+              </label>
+              {form.startDayMessageEnabled && <label className="notification-time-field"><span>Время сообщения</span><input type="time" value={form.startDayMessageTime} onChange={event => setForm(current => ({ ...current, startDayMessageTime: event.target.value }))} /></label>}
+            </div>
+            <div className="notification-time-section">
+              <label className="medication-feature-toggle">
+                <span><b>Итоги дня</b><small>Вечерняя сводка выполненного</small></span>
+                <input type="checkbox" checked={Boolean(form.endDaySummaryEnabled)} onChange={event => setForm(current => ({ ...current, endDaySummaryEnabled: event.target.checked }))} />
+              </label>
+              {form.endDaySummaryEnabled && <label className="notification-time-field"><span>Время сообщения</span><input type="time" value={form.endDaySummaryTime} onChange={event => setForm(current => ({ ...current, endDaySummaryTime: event.target.value }))} /></label>}
+            </div>
+          </div>}
         </section>
 
         <section className="medications-settings-section">
@@ -4550,6 +4620,17 @@ useEffect(() => {
     tg.expand();
 
     try {
+      const desktopPlatforms = new Set(["tdesktop", "weba", "macos", "windows"]);
+      const isDesktopTelegram = desktopPlatforms.has(tg.platform);
+      document.documentElement.classList.toggle("telegram-desktop", isDesktopTelegram);
+      if (isDesktopTelegram && tg.isFullscreen && typeof tg.exitFullscreen === "function") {
+        tg.exitFullscreen();
+      }
+    } catch (error) {
+      addLog(`[TMA] Не удалось восстановить обычное окно Mini App: ${error}`);
+    }
+
+    try {
       if (typeof tg.disableVerticalSwipes === "function") {
         tg.disableVerticalSwipes();
       }
@@ -4576,7 +4657,7 @@ useEffect(() => {
     }
     setTelegramUserId(id);
   });
-  return () => { cancelled = true; };
+  return () => { cancelled = true; document.documentElement.classList.remove("telegram-desktop"); };
 }, []);
 
 /// 2. Первичная загрузка данных из Supabase
@@ -4719,57 +4800,8 @@ useEffect(() => {
 {/* Bottom nav */}
 {!showSettings && <BottomNav active={activeTab} onChange={setActiveTab} />}
 
-<KeyboardDismissControl />
-
 </div>
 );
-}
-
-function KeyboardDismissControl() {
-  const [isInputFocused, setIsInputFocused] = useState(false);
-
-  useEffect(() => {
-    let focusOutTimer = 0;
-    const isEditable = (element: Element | null) => element instanceof HTMLInputElement
-      || element instanceof HTMLTextAreaElement
-      || (element instanceof HTMLElement && element.isContentEditable);
-    const onFocusIn = (event: FocusEvent) => setIsInputFocused(isEditable(event.target as Element | null));
-    const onFocusOut = () => {
-      window.clearTimeout(focusOutTimer);
-      focusOutTimer = window.setTimeout(() => setIsInputFocused(isEditable(document.activeElement)), 0);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isEditable(document.activeElement)) {
-        (document.activeElement as HTMLElement).blur();
-      }
-    };
-    document.addEventListener("focusin", onFocusIn);
-    document.addEventListener("focusout", onFocusOut);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.clearTimeout(focusOutTimer);
-      document.removeEventListener("focusin", onFocusIn);
-      document.removeEventListener("focusout", onFocusOut);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, []);
-
-  if (!isInputFocused) return null;
-  return (
-    <button
-      type="button"
-      className="keyboard-dismiss"
-      aria-label="Скрыть клавиатуру"
-      onPointerDown={event => {
-        event.preventDefault();
-        (document.activeElement as HTMLElement | null)?.blur();
-        setIsInputFocused(false);
-      }}
-    >
-      <Keyboard size={16} aria-hidden="true" />
-      <span>Готово</span>
-    </button>
-  );
 }
 
 // Helper: render per-character spans with index variable for CSS delay
