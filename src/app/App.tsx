@@ -1343,17 +1343,17 @@ function HomeTab({
                   <stop offset="100%" stopColor="#80b9ff" stopOpacity={0.015} />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} stroke="rgba(255,255,255,.13)" strokeDasharray="4 5" />
-              <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={9} tick={{ fontSize: 11, fill: "#c8d8ec" }} />
-              <YAxis tickLine={false} axisLine={false} tickMargin={6} width={36} tick={{ fontSize: 10, fill: "#b2c4dc" }} tickFormatter={value => `${value}ч`} domain={[0, "dataMax + 1"]} />
+              <CartesianGrid vertical={false} stroke="#e9edf2" strokeDasharray="3 6" />
+              <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={9} tick={{ fontSize: 12, fill: "#78828f" }} />
+              <YAxis tickLine={false} axisLine={false} tickMargin={6} width={36} tick={{ fontSize: 11, fill: "#78828f" }} tickFormatter={value => `${value}ч`} domain={[0, (max: number) => Math.max(max + 1, data.settings.workGoalHours + 1)]} />
               <Tooltip
                 labelFormatter={(_, payload) => payload?.[0]?.payload?.date ? formatDate(new Date(`${payload[0].payload.date}T12:00:00`)) : ""}
                 formatter={(value: number, name: string) => [`${value} ч`, name === "В работе" ? "В работе" : "Цель"]}
-                cursor={{ stroke: "rgba(255,255,255,.4)", strokeDasharray: "4 4" }}
-                contentStyle={{ borderRadius: 12, border: "1px solid rgba(255,255,255,.2)", background: "#142642", color: "#fff", boxShadow: "0 12px 30px rgba(8,22,42,.3)", fontSize: 12 }}
+                cursor={{ stroke: "#aabbd0", strokeDasharray: "4 4" }}
+                contentStyle={{ borderRadius: 16, border: "1px solid #edf0f4", background: "#fff", color: "#20252e", boxShadow: "0 12px 30px rgba(22,35,55,.12)", fontSize: 13 }}
               />
-              <Line dataKey="goal" name="Цель" type="linear" stroke="rgba(255,255,255,.48)" strokeWidth={1.5} strokeDasharray="4 5" dot={false} activeDot={false} isAnimationActive animationDuration={650} />
-              <Area dataKey="hours" name="В работе" type="monotone" stroke="#a9d2ff" strokeWidth={2.5} fill="url(#homeFocusFill)" dot={false} activeDot={{ r: 4, fill: "#fff", stroke: "#549AF2", strokeWidth: 3 }} isAnimationActive animationBegin={100} animationDuration={850} animationEasing="ease-out" />
+              <ReferenceLine y={data.settings.workGoalHours} stroke="#a9b8ca" strokeDasharray="4 5" />
+              <Area dataKey="hours" name="В работе" type="monotone" stroke="#549AF2" strokeWidth={3} fill="url(#homeFocusFill)" dot={false} activeDot={{ r: 5, fill: "#fff", stroke: "#549AF2", strokeWidth: 3 }} isAnimationActive animationBegin={100} animationDuration={850} animationEasing="ease-out" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -1372,8 +1372,15 @@ function HomeTab({
               <span>В фокусе за 7 дней</span>
               <b>{focusedDays}/7 дней</b>
             </div>
-            <strong>{weeklyHours.toFixed(1)} <small>ч</small></strong>
-            <div className="weekly-summary-track"><i style={{ width: `${Math.min(100, weeklyHours / Math.max(data.settings.workGoalHours * 7, 1) * 100)}%` }} /></div>
+            <svg className="weekly-progress-gauge" viewBox="0 0 300 176" role="img" aria-label={`${weeklyHours.toFixed(1)} из ${data.settings.workGoalHours * 7} часов недельной цели`}>
+              {Array.from({ length: 21 }, (_, index) => {
+                const angle = Math.PI - index * Math.PI / 20;
+                const progress = Math.min(1, weeklyHours / Math.max(data.settings.workGoalHours * 7, 1));
+                return <rect key={index} x={-6} y={-19} width={12} height={38} rx={5} transform={`translate(${150 + 118 * Math.cos(angle)} ${140 - 118 * Math.sin(angle)}) rotate(${90 - angle * 180 / Math.PI})`} fill={index / 21 < progress ? "#549AF2" : "#eef1f5"} />;
+              })}
+              <text x="150" y="120" textAnchor="middle" className="weekly-gauge-value">{weeklyHours.toFixed(1)} ч</text>
+              <text x="150" y="146" textAnchor="middle" className="weekly-gauge-caption">в фокусе за неделю</text>
+            </svg>
             <p>{weeklyHours.toFixed(1)} из {data.settings.workGoalHours * 7} ч недельной цели</p>
           </div>
           <div className="weekly-summary-list">
@@ -3371,7 +3378,7 @@ function NutritionTab({ data, setData }: { data: AppData; setData: (fn: (p: AppD
   };
 
   return (
-    <div className="app-page pt-14 pb-6">
+    <div className="app-page nutrition-page pt-14 pb-6">
       {/* Header */}
       <div className="px-4 mb-4">
         <h1 className="text-xl font-semibold text-[#1A1A2E] mb-4">Питание и дневник</h1>
@@ -3504,9 +3511,9 @@ function DiarySubTab({
   };
 
   return (
-    <div className="px-4 space-y-4">
+    <div className="nutrition-diary px-4 space-y-4">
       {/* Macros summary */}
-      <Card className="p-4">
+      <Card className="nutrition-summary-card p-4">
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Сегодня</SectionLabel>
           <span className="text-[13px] font-semibold text-[#1A1A2E]">{totals.kcal} / {settings.calorieGoal} ккал</span>
@@ -3514,9 +3521,9 @@ function DiarySubTab({
         <ProgressBar value={totals.kcal} max={settings.calorieGoal} />
         <div className="grid grid-cols-3 gap-2 mt-3">
           {[
-            { label: "Б", val: totals.protein, goal: settings.proteinGoal, color: "#4A90E2" },
-            { label: "Ж", val: totals.fat, goal: settings.fatGoal, color: "#E2944A" },
-            { label: "У", val: totals.carbs, goal: settings.carbsGoal, color: "#4AE2A0" },
+            { label: "Белки", val: totals.protein, goal: settings.proteinGoal, color: "#549AF2" },
+            { label: "Жиры", val: totals.fat, goal: settings.fatGoal, color: "#E2944A" },
+            { label: "Углеводы", val: totals.carbs, goal: settings.carbsGoal, color: "#48AA87" },
           ].map(m => (
             <div key={m.label} className="bg-white rounded-xl p-2.5">
               <div className="flex items-center justify-between mb-1.5">
@@ -3530,7 +3537,7 @@ function DiarySubTab({
       </Card>
 
       {/* Water */}
-      <Card className="p-4">
+      <Card className="nutrition-water-card p-4">
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Вода</SectionLabel>
           <span className="text-[12px] text-[#8A8A99]">{todayWater} / {settings.waterGoal} стаканов</span>
@@ -3540,6 +3547,7 @@ function DiarySubTab({
             <button
               key={i}
               onClick={() => setWater(i < todayWater ? i : i + 1)}
+              aria-label={`${i + 1} стаканов воды`}
               className={`transition-all active:scale-90 ${i < todayWater ? "text-[#4A90E2]" : "text-[#C0C0C0]"}`}
             >
               <IcoDrop filled={i < todayWater} />
@@ -3564,7 +3572,7 @@ function DiarySubTab({
       {MEAL_ORDER.map(meal => {
         const items = todayDiary[meal];
         return (
-          <div key={meal}>
+          <div key={meal} className="nutrition-meal-card">
             <div className="flex items-center justify-between mb-2">
               <SectionLabel>{MEAL_LABELS[meal]}</SectionLabel>
               <div className="flex gap-2">
@@ -3579,6 +3587,7 @@ function DiarySubTab({
                 ))}
                 <button
                   onClick={() => { setSearchSheet(meal); setSearchQuery(""); setSearchResults([]); setSelectedResult(null); }}
+                  aria-label={`Добавить продукт: ${MEAL_LABELS[meal]}`}
                   className="w-7 h-7 rounded-lg bg-[#F0F0EE] flex items-center justify-center text-[#1A1A2E] active:scale-95 transition-all"
                 >
                   <IcoPlus size={14} />

@@ -1,0 +1,185 @@
+/* Shared visual language: quiet surfaces, generous spacing, one blue accent. */
+:root { --ui-ink: #20252e; --ui-muted: #707b89; --ui-surface: #fff; --ui-canvas: #f4f5f7; --ui-accent: #549af2; --ui-line: #edf0f3; }
+body, .app-shell { background: var(--ui-canvas); }
+.app-shell { max-width: none; color: var(--ui-ink); }
+button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #a7ceff; outline-offset: 3px; }
+.app-page { padding-bottom: 28px; }
+.dashboard-panel, .app-card, .goal-card, .goals-date-panel, .work-hourly-card { border: 1px solid rgba(228,232,238,.65); border-radius: 24px; box-shadow: 0 3px 18px rgba(24,36,55,.025) !important; }
+.app-card:hover { transform: none; }
+.home-dashboard { background: transparent; gap: 20px; }
+.home-header { align-items: center; }
+.home-header h1 { color: var(--ui-ink); font-weight: 600; letter-spacing: -.05em; }
+.home-header > div > p:last-child { margin-top: 8px; color: var(--ui-muted); font-size: 14px; }
+.home-settings-button, .home-date-chip { min-height: 42px; border: 1px solid var(--ui-line); border-radius: 999px; background: #fff; box-shadow: none; }
+.home-banner { min-height: 60px; padding: 12px 18px; border: 0; border-radius: 18px; background: #eaf2fd; box-shadow: none; }
+.home-banner-title { color: #365a85; font-size: 13px; }
+.home-banner-subtitle, .home-banner-date { color: #637e9f; }
+.dashboard-panel-header { min-height: 70px; padding: 22px 24px 12px; border: 0; }
+.dashboard-panel-header h2 { color: var(--ui-ink); font-size: 18px; font-weight: 600; letter-spacing: -.035em; }
+.dashboard-panel-icon { display: none; }
+.dashboard-panel-content { padding: 12px 24px 24px; }
+.dashboard-period-chip, .dashboard-count-chip, .medication-count-chip { padding: 8px 12px; border: 0; background: #f4f5f7; color: #647082; font-size: 11px; font-weight: 500; }
+.home-focus-panel { background: #fff !important; border-color: var(--ui-line); box-shadow: none !important; }
+.home-focus-panel::before, .home-focus-panel::after { display: none; }
+.home-focus-panel .dashboard-panel-header h2 { color: var(--ui-ink); }
+.home-focus-panel .dashboard-period-chip { color: #657386; background: #f4f5f7; border: 0; }
+.home-focus-panel .dashboard-chart-total { color: var(--ui-ink); font-size: 36px; font-weight: 600; letter-spacing: -.055em; }
+.home-focus-panel .dashboard-chart-caption { color: var(--ui-muted); font-size: 12px; }
+.home-focus-panel .dashboard-demo-label { color: #53759c; background: #edf4fd; border: 0; }
+.home-line-chart { height: 230px; margin-top: 20px; }
+.home-focus-panel .dashboard-chart-legend { color: #778291; border-top-color: var(--ui-line); flex-wrap: wrap; row-gap: 9px; font-size: 11px; }
+.home-focus-panel .dashboard-chart-legend b { color: #303b49; }
+.home-focus-panel .legend-line-blue { background: var(--ui-accent); border-color: var(--ui-accent); }
+.home-focus-panel .legend-line-muted { border-color: #a9b8ca; }
+.weekly-summary { gap: 18px; }
+.weekly-summary-hero { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.weekly-summary-heading { color: #758292; font-size: 11px; }
+.weekly-summary-icon { display: none; }
+.weekly-summary-heading b { background: #f4f5f7; color: #5f6f82; font-weight: 500; }
+.weekly-progress-gauge { display: block; width: min(100%,320px); margin: 12px auto 0; overflow: visible; }
+.weekly-gauge-value { fill: #20252e; font: 600 34px Inter,sans-serif; letter-spacing: -1.5px; }
+.weekly-gauge-caption { fill: #7b8490; font: 12px Inter,sans-serif; }
+.weekly-summary-hero > p { margin-top: 0; text-align: center; color: #798492; font-size: 11px; }
+.weekly-summary-list { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.weekly-summary-row { min-width: 0; min-height: 84px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; padding: 12px; border: 0; border-radius: 15px; background: #f5f6f8; }
+.weekly-row-icon { display: none; }
+.weekly-summary-row > span { font-size: 10px; color: #737e8d; }
+.weekly-summary-row b { margin: 0; color: #242e3b; font-size: 18px; letter-spacing: -.04em; }
+.weekly-summary-row b small { font-size: 11px; }
+.home-kpi-strip { gap: 16px; }
+.home-kpi-strip .dashboard-metric { position: relative; min-height: 152px; display: flex; align-items: flex-start; padding: 23px; border: 0; border-radius: 22px; background: #fff; box-shadow: none; }
+.dashboard-metric-copy { gap: 12px; width: 100%; }
+.dashboard-metric-label { padding-right: 42px; color: #738091; font-size: 13px; font-weight: 500; }
+.dashboard-metric-value { color: #20252e; font-size: 31px; font-weight: 600; letter-spacing: -.045em; }
+.dashboard-metric-detail { color: #8b94a1; font-size: 11px; }
+.dashboard-metric-icon { position: absolute; right: 20px; top: 20px; width: 39px; height: 39px; border-radius: 50%; }
+.home-kpi-strip .dashboard-metric:first-child { background: #549af2; }
+.dashboard-metric:first-child .dashboard-metric-label, .dashboard-metric:first-child .dashboard-metric-detail { color: #ecf5ff; }
+.dashboard-metric:first-child .dashboard-metric-value { color: #fff; }
+.dashboard-metric:first-child .dashboard-metric-icon { background: #fff; color: #4389e0; }
+.dashboard-goal-list, .dashboard-habit-list { gap: 0; }
+.dashboard-goal-row, .dashboard-habit-row { padding: 18px 0; border: 0; border-bottom: 1px solid var(--ui-line); border-radius: 0; background: transparent; box-shadow: none; }
+.dashboard-goal-row:last-child, .dashboard-habit-row:last-child { border-bottom: 0; }
+.dashboard-goal-copy > p, .dashboard-habit-copy p { font-size: 14px; font-weight: 550; color: #303846; line-height: 1.5; }
+.dashboard-goal-meta { margin-top: 7px; font-size: 11px; }
+.dashboard-goal-check { width: 25px; height: 25px; border-radius: 8px; }
+.dashboard-habit-icon { width: 42px; height: 42px; border-radius: 14px; background: #edf4ff; }
+.dashboard-habit-streak { border: 0; background: #f0f6ed; color: #597943; padding: 9px 11px; font-size: 12px; }
+.dashboard-panel-link, .dashboard-empty-action { min-height: 40px; border: 1px solid #e8ecf1; border-radius: 999px; background: #fff; color: #46566c; font-size: 12px; }
+.dashboard-empty { min-height: 150px; }
+.dashboard-empty-icon { border-radius: 50%; background: #f0f5fc; }
+.dashboard-calorie-ring { box-shadow: none; width: 128px; height: 128px; flex-basis: 128px; }
+.dashboard-calorie-ring > div { width: 108px; height: 108px; }
+.dashboard-calorie-ring b { font-size: 26px; font-weight: 600; letter-spacing: -.04em; }
+.dashboard-calorie-copy b { font-size: 16px; font-weight: 550; }
+.dashboard-macro-row { min-height: 48px; padding: 10px 12px; background: #f6f7f9; border-radius: 12px; }
+.dashboard-macro-track { height: 5px; }
+.dashboard-meals-panel { border-color: var(--ui-line); }
+.medication-card { padding: 20px; border: 0; border-radius: 19px; background: #f6f8fb; }
+.medication-card-title b { font-size: 15px; }
+.medication-dose-row { border-color: #ecf0f5; border-radius: 14px; min-height: 62px; }
+.medication-card-icon { border-radius: 50%; background: #e7effc; }
+.work-page-header h1, .goals-header h1, .habits-header h1 { font-weight: 600; color: var(--ui-ink); letter-spacing: -.05em; }
+.work-heading-copy > p, .goals-header-copy, .habits-header-copy { font-size: 13px; line-height: 1.6; color: #788391; }
+.work-page .app-card.work-focus-card { background: #222b38 !important; border: 0; box-shadow: none !important; }
+.work-focus-card::before, .work-focus-card::after { display: none; }
+.work-hourly-card, .work-week-card, .work-chart, .work-days { padding: 24px; }
+.work-hourly-title h2, .work-week-heading h2, .work-chart-heading h2, .work-days-heading h2 { font-size: 19px; font-weight: 600; }
+.work-overline, .goals-eyebrow, .habits-eyebrow { font-size: 10px; letter-spacing: .09em; }
+.work-view-switch, .goals-filters { padding: 5px; border: 0; border-radius: 999px; background: #e9ecf1; }
+.work-view-indicator { border-radius: 999px; }
+.goals-overview { background: #eaf2fd; border: 0; border-radius: 24px; box-shadow: none; }
+.goal-card { border-left-width: 1px; overflow: hidden; }
+.goal-card::before { display: none; }
+.goal-card-main { padding: 22px; }
+.goal-card-title { font-size: 17px; font-weight: 600; line-height: 1.5; letter-spacing: -.025em; }
+.goal-card-meta { gap: 8px; margin-top: 12px; }
+.goal-priority-chip, .goal-group-chip, .goal-meta-detail, .goal-status-chip { font-size: 11px; min-height: 26px; font-weight: 500; }
+.goal-complete-button { border-radius: 999px; min-height: 36px; font-size: 11px; }
+.goal-edit-action { font-size: 11px; min-height: 36px; }
+.goals-create-button, .habits-add-button { min-height: 44px; padding-inline: 18px; border-radius: 999px; box-shadow: none; font-size: 13px; }
+.habits-hero { background: #222b38; border-radius: 24px; padding: 28px; box-shadow: none; }
+.habits-hero-copy > p:last-child { font-size: 13px; }
+.habit-card { background: #fff !important; border: 1px solid var(--ui-line); border-radius: 24px; }
+.settings-screen { background: #fafbfd; }
+.settings-screen section { background: #fff; border: 1px solid #edf0f5; border-radius: 20px; padding: 20px; }
+.settings-screen section > p:first-child { margin-bottom: 16px; font-size: 11px; color: #657386; }
+.app-attribution { opacity: .65; }
+.nutrition-page > div:first-child > h1 { font-size: 30px; font-weight: 600; letter-spacing: -.045em; margin-bottom: 22px; }
+.nutrition-page > div:first-child > div { max-width: 360px; padding: 5px; border-radius: 999px; background: #e9ecf1; }
+.nutrition-page > div:first-child > div > button { min-height: 40px; border-radius: 999px; }
+.nutrition-diary .nutrition-summary-card, .nutrition-diary .nutrition-water-card { padding: 24px; background: #fff; }
+.nutrition-summary-card > div:first-child { align-items: flex-start; }
+.nutrition-summary-card > div:first-child > span { font-size: 23px; font-weight: 600; letter-spacing: -.04em; }
+.nutrition-summary-card > .grid > div { padding: 14px 10px; border-radius: 14px; background: #f4f6f9; }
+.nutrition-summary-card > .grid > div > div:first-child { flex-direction: column; align-items: flex-start; gap: 9px; }
+.nutrition-summary-card > .grid > div > div:first-child > span:last-child { font-size: 20px; }
+.nutrition-water-card { background: #eaf3ff !important; }
+.nutrition-water-card button { display: grid; place-items: center; min-width: 36px; min-height: 40px; border-radius: 12px; background: rgba(255,255,255,.65); }
+.nutrition-meal-card { padding: 22px; border: 1px solid var(--ui-line); border-radius: 22px; background: #fff; }
+.nutrition-meal-card > div:first-child > p { margin: 0; font-size: 13px; color: #4c5b6e; letter-spacing: .04em; }
+.nutrition-meal-card > div:first-child button { min-width: 36px; min-height: 36px; border-radius: 50%; background: #eff4fc; color: #417fcb; }
+.nutrition-meal-card > .space-y-1\.5 { margin-top: 16px; }
+@media (min-width: 900px) {
+  .nutrition-diary { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+  .nutrition-diary > * { margin: 0 !important; }
+  .nutrition-diary > button { grid-column: 1 / -1; min-height: 52px; border-radius: 18px; }
+}
+@media (min-width: 900px) {
+  .app-nav { top: 18px; bottom: 18px; left: 18px; width: 202px; height: auto; padding: 30px 13px !important; border: 0; border-radius: 26px; background: #202631; box-shadow: none; }
+  .app-nav-brand { padding: 0 12px 36px; color: #fff; font-size: 21px; letter-spacing: -.045em; }
+  .app-nav-items { gap: 9px; }
+  .app-nav-items > button { min-height: 51px; padding: 0 15px; border-radius: 15px; color: #aab3c2; }
+  .app-nav-items > button[aria-current="page"] { color: #fff; background: #549af2; box-shadow: none; }
+  .app-nav-items > button > span { font-size: 13px; font-weight: 500; }
+  .app-content { left: 236px; padding: 30px 30px 30px 14px !important; }
+  .app-page { width: min(100%,1400px); padding-top: 12px !important; }
+  .home-dashboard { grid-template-areas: "header header header header header header header header header header header header" "kpis kpis kpis kpis kpis kpis kpis kpis kpis kpis kpis kpis" "weekly weekly weekly weekly weekly weekly weekly weekly assets assets assets assets" "banner banner banner banner banner banner banner banner banner banner banner banner" "medications medications medications medications medications medications medications medications medications medications medications medications" "goals goals goals goals goals goals habits habits habits habits habits habits" "nutrition nutrition nutrition nutrition nutrition nutrition nutrition nutrition nutrition nutrition nutrition nutrition"; gap: 20px; }
+  .home-header { margin-bottom: 10px; }
+  .home-header h1 { font-size: clamp(28px,2.7vw,38px); }
+  .home-focus-panel .dashboard-panel-content { padding-top: 8px; }
+  .home-line-chart { height: 235px; }
+  .home-assets .dashboard-panel-content { padding: 10px 20px 22px; }
+  .weekly-summary-row { padding: 11px 9px; }
+  .dashboard-empty { grid-template-columns: 44px minmax(0,1fr); }
+  .dashboard-empty-action { grid-column: 2; justify-self: start; }
+}
+@media (max-width: 899px) {
+  .app-nav { border-top: 1px solid #edf0f4; background: rgba(255,255,255,.97); box-shadow: 0 -8px 30px rgba(31,43,65,.035); }
+  .app-nav-items > button[aria-current="page"] { color: #367ccd; }
+  .home-dashboard { display: flex; flex-direction: column; padding-inline: 16px; gap: 16px; }
+  .home-header { order: -4; }
+  .home-kpi-strip { order: -3; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  .home-kpi-strip .dashboard-metric:first-child { grid-column: 1 / -1; min-height: 130px; }
+  .home-kpi-strip .dashboard-metric { min-height: 148px; padding: 18px; border-radius: 20px; }
+  .dashboard-metric-value { font-size: 27px; }
+  .dashboard-metric-icon { width: 30px; height: 30px; right: 14px; top: 16px; }
+  .dashboard-metric-label { padding-right: 28px; font-size: 12px; }
+  .dashboard-metric-detail { font-size: 11px; }
+  .home-weekly { order: -2; }
+  .home-assets { order: -1; }
+  .dashboard-panel-header { padding: 20px 18px 10px; }
+  .dashboard-panel-header h2 { font-size: 17px; }
+  .dashboard-panel-content { padding: 12px 18px 20px; }
+  .dashboard-period-chip { font-size: 10px; padding: 7px 9px; }
+  .weekly-progress-gauge { max-width: 300px; }
+  .weekly-summary-row { align-items: center; padding: 11px 6px; }
+  .dashboard-chart-legend > .ml-auto { margin-left: 0; }
+  .dashboard-nutrition-layout { grid-template-columns: minmax(0,1fr); }
+  .work-hourly-card, .work-week-card, .work-chart, .work-days { padding: 20px 16px; }
+  .goal-card-main { padding: 16px; }
+  .goals-header-actions .goals-create-button { width: 42px; min-width: 42px; padding: 0; font-size: 0; }
+  .goals-header-actions .goals-create-button svg { width: 19px; height: 19px; }
+  .goal-card-title { font-size: 15px; }
+  .goal-card-meta { gap: 5px; }
+  .goal-priority-chip, .goal-group-chip, .goal-meta-detail, .goal-status-chip { font-size: 10px; }
+  .habits-hero { padding: 22px 18px; }
+  .settings-screen section { padding: 16px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dashboard-metric, .goal-card, .medication-card, .habit-card { transition: box-shadow 180ms ease, border-color 180ms ease; }
+  .goal-card:hover, .medication-card:hover { border-color: #cfdff3; box-shadow: 0 7px 22px rgba(31,53,86,.055) !important; }
+  .weekly-progress-gauge rect { animation: gauge-appear .55s ease-out both; transform-box: fill-box; }
+  @keyframes gauge-appear { from { opacity: .15; } to { opacity: 1; } }
+}
