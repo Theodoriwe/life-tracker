@@ -208,6 +208,8 @@ const PRIORITY_COLORS: Record<Priority, string> = {
   low: "#131826",
 };
 
+const PRIORITY_INK: Record<Priority, string> = { high: "#285EA4", medium: "#526514", low: "#45516A" };
+
 const PRIORITY_LABELS: Record<Priority, string> = {
   high: "Высокий",
   medium: "Средний",
@@ -249,10 +251,10 @@ function getGoalGroupLabel(group: GoalGroup, selectedDate: string, todayKey: str
 function getGoalCountWord(count: number): string {
   const lastTwo = count % 100;
   const last = count % 10;
-  if (lastTwo >= 11 && lastTwo <= 14) return "целей";
-  if (last === 1) return "цель";
-  if (last >= 2 && last <= 4) return "цели";
-  return "целей";
+  if (lastTwo >= 11 && lastTwo <= 14) return "задач";
+  if (last === 1) return "задача";
+  if (last >= 2 && last <= 4) return "задачи";
+  return "задач";
 }
 
 function getGoalDateValue(goal: Goal, fallbackDate: string): string {
@@ -1966,6 +1968,27 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [selectedGoalDetailsId, setSelectedGoalDetailsId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [completionNotice, setCompletionNotice] = useState<{ goal: Goal; date: string } | null>(null);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    if (!completionNotice) return;
+    const timer = window.setTimeout(() => setCompletionNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [completionNotice]);
+  const celebrateCompletion = (id: string) => {
+    const goal = data.goals.find(item => item.id === id);
+    if (goal) setCompletionNotice({ goal, date: selectedDate });
+  };
+  const undoCompletion = () => {
+    if (!completionNotice) return;
+    const { goal, date } = completionNotice;
+    setData(prev => ({ ...prev, goals: prev.goals.map(item => item.id !== goal.id ? item : {
+      ...item, completed: goal.completed, completedAt: goal.completedAt,
+      subtasks: item.subtasks.map(step => ({ ...step, done: goal.subtasks.find(old => old.id === step.id)?.done ?? step.done })),
+      recurrenceState: { ...item.recurrenceState, [date]: goal.recurrenceState?.[date] ?? { completed: false, missed: false, missedStreak: 0 } },
+    }) }));
+    setCompletionNotice(null);
+  };
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const dateStripRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<{ dragging: boolean; startX: number; startScrollLeft: number }>({
@@ -2120,6 +2143,9 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   const remainingVisibleGoals = totalVisibleGoals - completedVisibleGoals;
   const overdueVisibleGoals = visibleGoals.filter(goal => !isGoalCompletedForDate(goal, selectedDate) && isGoalOverdue(goal, selectedDate)).length;
   const goalCompletionPercent = totalVisibleGoals ? Math.round(completedVisibleGoals / totalVisibleGoals * 100) : 0;
+  const topPriorityGoals = visibleActiveSections.flatMap(section => section.todos)
+    .sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
+    .slice(0, 4);
 
   const pruneExpiredArchivedGoals = useCallback(() => {
     setData(prev => ({
@@ -2135,6 +2161,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   }, [pruneExpiredArchivedGoals]);
 
   const handleComplete = (id: string) => {
+    celebrateCompletion(id);
     setData(prev => ({
       ...prev,
       goals: prev.goals.map(g => {
@@ -2165,6 +2192,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   };
 
   const handleUncomplete = (id: string) => {
+    setCompletionNotice(null);
     setData(prev => ({
       ...prev,
       goals: prev.goals.map(g => {
@@ -2216,10 +2244,15 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   };
 
   const handleToggleSubtask = (goalId: string, subId: string) => {
+    const goal = data.goals.find(item => item.id === goalId);
+    const step = goal?.subtasks.find(item => item.id === subId);
+    if (!goal || !step) return;
+    if (step.done) setCompletionNotice(null);
+    if (!step.done && goal.subtasks.every(item => item.id === subId || item.done)) celebrateCompletion(goalId);
     setData(prev => ({
       ...prev,
       goals: prev.goals.map(g => {
-        if (g.id !== goalId) return g;
+        if (g.id !== goalId || !g.subtasks.some(s => s.id === subId)) return g;
         const updatedSubtasks = g.subtasks.map(s => s.id === subId ? { ...s, done: !s.done } : s);
         const allDone = updatedSubtasks.length > 0 && updatedSubtasks.every(s => s.done);
         return {
@@ -2327,12 +2360,15 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
     setNewSubtask("");
   };
 
-  const dateItems = Array.from({ length: 14 }, (_, index) => {
-    const day = addDays(new Date(`${selectedDate}T12:00:00`), index - 6);
+  const selectedDay = new Date(`${selectedDate}T12:00:00`);
+  const mondayOffset = (selectedDay.getDay() + 6) % 7;
+  const weekStart = addDays(selectedDay, -mondayOffset);
+  const dateItems = Array.from({ length: 7 }, (_, index) => {
+    const day = addDays(weekStart, index);
     const key = getDateKey(day);
     return {
       key,
-      label: key === todayKey ? "Сегодня" : `${day.getDate()} ${["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"][day.getMonth()]}`,
+      label: `${day.getDate()}`,
       short: ["вс", "пн", "вт", "ср", "чт", "пт", "сб"][day.getDay()],
     };
   });
@@ -2396,51 +2432,57 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   }, [showAddSheet]);
 
   return (
-    <div className="app-page goals-page pt-14 pb-6">
+    <div className="app-page goals-page planner-v2 pt-14 pb-6">
+      <div className="planner-completion-live" role="status" aria-live="polite">{completionNotice ? `Задача выполнена: ${completionNotice.goal.title}` : ""}</div>
+      <AnimatePresence>
+        {completionNotice && <motion.div key={completionNotice.goal.id} className="planner-completion-notice" initial={{ opacity: 0, y: reduceMotion ? 0 : 20, scale: reduceMotion ? 1 : .94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: reduceMotion ? 0 : 12 }}>
+          <span className="planner-completion-medal" aria-hidden="true"><Check size={23} strokeWidth={3} /><Sparkles size={14} /></span>
+          <div><b>Ещё один шаг сделан!</b><p>{completionNotice.goal.title}</p></div>
+          <button type="button" onClick={undoCompletion}><Undo2 size={15} />Отменить</button>
+          <button type="button" className="planner-notice-close" aria-label="Скрыть подтверждение" onClick={() => setCompletionNotice(null)}><X size={16} /></button>
+        </motion.div>}
+      </AnimatePresence>
       <header className="goals-header">
         <div className="goals-heading-copy">
-          <p className="goals-eyebrow"><span />ПЛАНИРОВАНИЕ</p>
-          <h1>Цели</h1>
-          <p>Планируй важное на день и двигайся к большим результатам.</p>
+          <p className="goals-eyebrow"><CalendarDays size={20} />ЛИЧНЫЙ ПЛАНИРОВЩИК</p>
+          <h1>Мой план</h1>
+          <p>Место для твоих задач и больших идей.</p>
         </div>
         <div className="goals-header-actions">
           <button type="button" className="goals-archive-button" onClick={() => setShowArchive(true)}><IcoArchive />Архив</button>
-          <button type="button" className="goals-create-button" onClick={() => openGoalEditor()}><IcoPlus />Новая цель</button>
+          <button type="button" className="goals-create-button" onClick={() => openGoalEditor()}><IcoPlus />Новая задача</button>
         </div>
       </header>
 
-      <div className="goals-content">
-        <section className="goals-overview" aria-label="Прогресс по целям">
-          <div className="goals-overview-copy">
-            <span className="goals-overview-icon"><Target size={18} /></span>
-            <div>
-              <p>{selectedDate === todayKey ? "ТВОЙ ПЛАН НА СЕГОДНЯ" : `ПЛАН · ${formatGoalDate(selectedDate).toLocaleUpperCase("ru-RU")}`}</p>
-              <h2>{totalVisibleGoals === 0 ? "Освободи место для важного" : remainingVisibleGoals === 0 ? "План выполнен" : "Двигайся в своём темпе"}</h2>
-              <span>{totalVisibleGoals === 0 ? "Добавь цель — и мы поможем превратить её в понятные шаги." : `${completedVisibleGoals} из ${totalVisibleGoals} ${totalVisibleGoals === 1 ? "цели" : "целей"} выполнено`}</span>
-            </div>
-          </div>
-          <div className="goals-overview-count"><strong>{completedVisibleGoals}<small>/{totalVisibleGoals}</small></strong><span>выполнено</span></div>
-          <div className="goals-overview-track"><i style={{ width: `${goalCompletionPercent}%` }} /></div>
-          <div className="goals-overview-foot"><span>{remainingVisibleGoals ? `Осталось: ${remainingVisibleGoals}` : totalVisibleGoals ? "Все цели закрыты" : "Начни с одной цели"}</span>{overdueVisibleGoals > 0 && <b>{overdueVisibleGoals} просрочено</b>}</div>
-        </section>
+      <section className="goals-planner-hero" aria-label="Планирование дня">
+        <div className="goals-planner-illustration" aria-hidden="true">
+          <svg viewBox="0 0 130 120" fill="none"><path d="M19 21l9-7M108 87l9 8M104 12v12M98 18h12" stroke="#D9B46C" strokeWidth="2" strokeLinecap="round"/><g transform="rotate(-8 65 60)"><rect x="25" y="26" width="80" height="79" rx="13" fill="#EEF2FF"/><rect x="21" y="21" width="80" height="79" rx="13" fill="white" stroke="#DBE2F3" strokeWidth="2"/><path d="M21 34c0-7 6-13 13-13h54c7 0 13 6 13 13v11H21V34Z" fill="#549AF2"/><path d="M41 15v14M81 15v14" stroke="#BDD5FC" strokeWidth="6" strokeLinecap="round"/>{[0,1,2].flatMap(row => [0,1,2].map(col => <rect key={`${row}-${col}`} x={34+col*20} y={54+row*13} width="12" height="8" rx="2" fill={row===1 && col===1 ? '#BDD5FC' : '#E8ECF7'} />))}<circle cx="89" cy="83" r="18" fill="#549AF2" stroke="white" strokeWidth="3"/><path d="m81 83 5 5 10-11" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></g><path d="m12 67 3-7 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="#F6E6BB"/></svg>
+        </div>
+        <div className="goals-planner-copy">
+          <p>СЕГОДНЯ — ХОРОШИЙ ДЕНЬ, ЧТОБЫ НАЧАТЬ</p>
+          <h2>Твоё будущее.<br /><span>В твоих планах.</span></h2>
+          <span>Освободи время для важного. <Heart size={13} fill="currentColor" /></span>
+        </div>
+        <aside className="goals-planner-note"><Heart size={15} /><p>Маленький шаг сегодня.<br /><b>Большая перемена завтра.</b></p></aside>
+      </section>
 
+      <div className="goals-content">
         <section className="goals-date-panel" aria-label="Выбор даты">
           <div className="goals-date-heading">
             <div className="goals-date-current">
-              <span className="goals-date-icon"><CalendarDays size={17} /></span>
-              <span><small>ВЫБРАННАЯ ДАТА</small><b>{selectedDate === todayKey ? `Сегодня · ${formatGoalDate(todayKey)}` : formatGoalDate(selectedDate)}</b></span>
+              <span><small>КАЛЕНДАРЬ</small><b>{selectedDay.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }).replace(/\s*г\.$/, "")}</b></span>
             </div>
             <div className="goals-date-actions">
               {selectedDate !== todayKey && <button type="button" className="goals-today-button" onClick={goToToday}>Сегодня</button>}
-              <button type="button" className="goals-date-nav" aria-label="Предыдущий день" onClick={() => changeSelectedDate(-1)}><ChevronLeft size={17} /></button>
-              <button type="button" className="goals-date-nav" aria-label="Следующий день" onClick={() => changeSelectedDate(1)}><ChevronRight size={17} /></button>
-              <button type="button" className="goals-date-picker-button" onClick={openDatePicker}>Выбрать дату</button>
+              <button type="button" className="goals-date-nav" aria-label="Предыдущая неделя" onClick={() => changeSelectedDate(-7)}><ChevronLeft size={17} /></button>
+              <button type="button" className="goals-date-nav" aria-label="Следующая неделя" onClick={() => changeSelectedDate(7)}><ChevronRight size={17} /></button>
+              <button type="button" className="goals-date-picker-button" aria-label="Выбрать дату" onClick={openDatePicker}><CalendarDays size={16} /><span>Дата</span></button>
             </div>
           </div>
-          <input ref={datePickerRef} type="date" value={selectedDate} onChange={handleDatePickerChange} className="goals-date-input" aria-label="Выбрать дату целей" />
+          <input ref={datePickerRef} type="date" value={selectedDate} onChange={handleDatePickerChange} className="goals-date-input" aria-label="Выбрать дату задач" />
           <div ref={dateStripRef} className="goals-date-strip hide-scrollbar" onWheel={handleDateStripWheel} onMouseDown={handleDateStripMouseDown}>
             {dateItems.map(item => (
-              <button key={item.key} type="button" role="tab" aria-selected={selectedDate === item.key} onClick={() => setSelectedDate(item.key)} className={`goals-date-chip ${selectedDate === item.key ? "is-selected" : ""}`}>
+              <button key={item.key} type="button" role="tab" aria-label={formatGoalDate(item.key)} aria-selected={selectedDate === item.key} onClick={() => setSelectedDate(item.key)} className={`goals-date-chip ${selectedDate === item.key ? "is-selected" : ""} ${item.key === todayKey ? "is-today" : ""}`}>
                 <small>{item.short}</small><b>{item.label}</b>
               </button>
             ))}
@@ -2448,7 +2490,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
         </section>
 
         <div className="goals-filter-row">
-          <div className="goals-filters" role="tablist" aria-label="Фильтр целей">
+          <div className="goals-filters" role="tablist" aria-label="Фильтр задач">
             {(["all", "today", "week", "longterm"] as GoalGroup[]).map(value => (
               <button key={value} type="button" role="tab" aria-selected={group === value} onClick={() => setGroup(value)} className={`goals-filter ${group === value ? "is-selected" : ""}`}>
                 {getGoalGroupLabel(value, selectedDate, todayKey)}
@@ -2458,11 +2500,13 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
           <span className="goals-filter-count">{totalVisibleGoals} {getGoalCountWord(totalVisibleGoals)}</span>
         </div>
 
+        <div className="goals-schedule-heading"><div><span><Clock3 size={17} /></span><div><h2>План на день</h2><p>Задачи, которые помогут тебе двигаться вперёд</p></div></div><span>{selectedDate === todayKey ? "Сегодня" : formatGoalDate(selectedDate)}</span></div>
+
         {totalVisibleGoals === 0 ? (
           <div className="goals-empty-state">
             <span className="goals-empty-icon"><Target size={22} /></span>
-            <div><h2>{group === "all" ? "Пока нет целей на эту дату" : `Здесь пока нет целей: ${getGoalGroupLabel(group, selectedDate, todayKey).toLocaleLowerCase("ru-RU")}`}</h2><p>Создай цель, добавь пару шагов и отмечай прогресс по мере выполнения.</p></div>
-            <button type="button" onClick={() => openGoalEditor()}><Plus size={17} />Добавить цель</button>
+            <div><h2>{group === "all" ? "Пока нет задач на эту дату" : `Здесь пока нет задач: ${getGoalGroupLabel(group, selectedDate, todayKey).toLocaleLowerCase("ru-RU")}`}</h2><p>Добавь задачу и отмечай прогресс по мере выполнения.</p></div>
+            <button type="button" onClick={() => openGoalEditor()}><Plus size={17} />Добавить задачу</button>
           </div>
         ) : (
           <div className="goals-sections">
@@ -2484,10 +2528,10 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
               </section>
             ))}
             {totalVisibleGoals > 0 && (
-              <section className="goal-group-section goals-completed-list" aria-label="Выполненные цели">
+              <section className="goal-group-section goals-completed-list" aria-label="Выполненные задачи">
                 <div className="goal-group-heading goal-completed-heading">
                   <div><span className="goal-group-dot" /><h2>Выполненные</h2><span>{completedGoals.length}</span></div>
-                  <p>{completedGoals.length ? "Можно открыть или вернуть" : "Готовые цели будут здесь"}</p>
+                  <p>{completedGoals.length ? "Можно открыть или вернуть" : "Выполненные задачи будут здесь"}</p>
                 </div>
                 {completedGoals.length > 0 ? (
                   <div className="goal-card-grid goal-card-grid-completed">
@@ -2499,17 +2543,39 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
                       ))}
                     </AnimatePresence>
                   </div>
-                ) : <p className="goal-completed-empty">Отмеченные цели останутся здесь — их можно будет открыть или вернуть.</p>}
+                ) : <p className="goal-completed-empty">Отмеченные задачи останутся здесь — их можно будет открыть или вернуть.</p>}
               </section>
             )}
           </div>
         )}
+
+        <div className="goals-afterword-grid">
+          <section className="goals-reminder-card"><span><Sparkles size={20} /></span><div><b>Один шаг уже имеет значение</b><p>Выбери важное и начни с него. Остальное — в своём темпе.</p></div></section>
+          <section className="goals-overview" aria-label="Прогресс по задачам">
+            <div className="goals-overview-copy">
+              <span className="goals-overview-icon"><Target size={18} /></span>
+              <div>
+                <p>{selectedDate === todayKey ? "СЕГОДНЯ" : formatGoalDate(selectedDate)}</p>
+                <h2>Прогресс дня</h2>
+                <span>{totalVisibleGoals === 0 ? "Добавь задачу, чтобы увидеть свой прогресс." : `${completedVisibleGoals} из ${totalVisibleGoals} задач выполнено`}</span>
+              </div>
+            </div>
+            <div className="goals-overview-count"><strong>{completedVisibleGoals}<small>/{totalVisibleGoals}</small></strong><span>выполнено</span></div>
+            <div className="goals-progress-ring" role="img" aria-label={`Выполнено ${goalCompletionPercent} процентов задач`}><svg viewBox="0 0 112 112" aria-hidden="true"><circle cx="56" cy="56" r="47" stroke="#EDEEF7" strokeWidth="8" fill="none"/><circle className="planner-ring-value" cx="56" cy="56" r="47" pathLength="100" stroke="#549AF2" strokeWidth="8" fill="none" strokeDasharray={`${goalCompletionPercent} 100`} strokeLinecap={goalCompletionPercent ? "round" : "butt"} transform="rotate(-90 56 56)"/></svg><div><b>{goalCompletionPercent}%</b><span>выполнено</span></div></div>
+            <div className="goals-overview-foot"><span>{remainingVisibleGoals ? `Осталось: ${remainingVisibleGoals}` : totalVisibleGoals ? "Все задачи закрыты" : "Начни с одной задачи"}</span>{overdueVisibleGoals > 0 && <b>{overdueVisibleGoals} просрочено</b>}</div>
+          </section>
+          <section className="goals-priorities-card" aria-label="Приоритетные задачи">
+            <div className="goals-priorities-heading"><span><Target size={16} /></span><div><h2>В фокусе</h2><p>Сначала самое важное</p></div><Sparkles size={16} /></div>
+            {topPriorityGoals.length ? <ul>{topPriorityGoals.map(goal => <li key={goal.id}><button type="button" onClick={() => openGoalDetails(goal)}><span className="planner-priority-dot" style={{ background: PRIORITY_COLORS[goal.priority] }} /><span>{goal.title}</span><ChevronRight size={13} /></button></li>)}</ul> : <p className="goals-priorities-empty">Добавь первую задачу — и выбери, с чего начать.</p>}
+          </section>
+          <section className="goals-closing-banner"><div><b>Большие планы.<br /><span>Маленькие шаги.</span></b><p>Так рождается твой новый ритм.</p></div><svg viewBox="0 0 100 80" fill="none" aria-hidden="true"><path d="M21 63c-11 0-16-8-14-16 1-7 7-11 13-12C18 17 30 8 44 13c10 3 15 11 15 20 14-3 23 5 23 17 0 7-6 13-15 13H21Z" fill="white" stroke="#9AAED9" strokeWidth="2"/><circle cx="34" cy="44" r="2.5" fill="#38476C"/><circle cx="51" cy="44" r="2.5" fill="#38476C"/><path d="M39 50q4 4 8 0" stroke="#38476C" strokeWidth="2" strokeLinecap="round"/><ellipse cx="28" cy="50" rx="4" ry="2" fill="#F3C8DB"/><ellipse cx="57" cy="50" rx="4" ry="2" fill="#F3C8DB"/><path d="m82 7 2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5Z" stroke="#9AAED9"/></svg></section>
+        </div>
       </div>
 
-      <button type="button" onClick={() => openGoalEditor()} className="goals-fab" aria-label="Добавить цель"><Plus size={22} /><span>Новая цель</span></button>
+      <button type="button" onClick={() => openGoalEditor()} className="goals-fab" aria-label="Добавить задачу"><Plus size={22} /><span>Новая задача</span></button>
 
       {/* Goal editor sheet */}
-      <BottomSheet open={showAddSheet} onClose={closeGoalEditor} title={editingGoalId ? "Редактировать цель" : "Новая цель"}>
+      <BottomSheet open={showAddSheet} onClose={closeGoalEditor} title={editingGoalId ? "Редактировать задачу" : "Новая задача"}>
         <div className="goals-editor-content px-5 py-4 space-y-4">
           <div>
             <label className="text-[12px] text-[#8A8A99] font-medium block mb-1.5">Название</label>
@@ -2566,7 +2632,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
                   className={`flex-1 py-2 rounded-xl text-[12px] font-medium transition-all active:scale-95 border ${
                     draft.priority === p ? "border-transparent text-white" : "border-[#E8E8E6] text-[#8A8A99]"
                   }`}
-                  style={draft.priority === p ? { background: `${PRIORITY_COLORS[p]}15`, color: PRIORITY_COLORS[p], borderColor: PRIORITY_COLORS[p] } : undefined}
+                  style={draft.priority === p ? { background: `${PRIORITY_COLORS[p]}15`, color: PRIORITY_INK[p], borderColor: PRIORITY_COLORS[p] } : undefined}
                 >
                   <span className="inline-flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full" style={{ background: PRIORITY_COLORS[p] }} />
@@ -2665,7 +2731,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
                 <p className="text-[11px] uppercase tracking-[0.24em] text-[#8A8A99] mb-2">Метки</p>
                 <div className="flex flex-wrap gap-2">
                   {selectedGoalDetails.priority !== "medium" && (
-                    <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: `${PRIORITY_COLORS[selectedGoalDetails.priority]}15`, color: PRIORITY_COLORS[selectedGoalDetails.priority] }}>
+                    <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: `${PRIORITY_COLORS[selectedGoalDetails.priority]}15`, color: PRIORITY_INK[selectedGoalDetails.priority] }}>
                       {PRIORITY_LABELS[selectedGoalDetails.priority]}
                     </span>
                   )}
@@ -3236,6 +3302,28 @@ function GoalCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [pendingSubtask, setPendingSubtask] = useState<string | null>(null);
+  const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => () => { if (finishTimer.current) clearTimeout(finishTimer.current); }, []);
+  const finishWithAnimation = (action: () => void, subtaskId?: string) => {
+    if (finishTimer.current) return;
+    if (reduceMotion) { action(); return; }
+    setFinishing(true);
+    setPendingSubtask(subtaskId ?? null);
+    finishTimer.current = setTimeout(() => {
+      action();
+      setFinishing(false);
+      setPendingSubtask(null);
+      finishTimer.current = null;
+    }, 420);
+  };
+  const toggleStep = (step: SubTask) => {
+    if (!step.done && goal.subtasks.every(item => item.id === step.id || item.done)) {
+      finishWithAnimation(() => onToggleSubtask(goal.id, step.id), step.id);
+    } else onToggleSubtask(goal.id, step.id);
+  };
   const completedSubtasks = goal.subtasks.filter(subtask => subtask.done).length;
   const progress = goal.subtasks.length ? Math.round(completedSubtasks / goal.subtasks.length * 100) : 0;
   const priorityColor = overdue ? "#D76969" : PRIORITY_COLORS[goal.priority];
@@ -3246,17 +3334,22 @@ function GoalCard({
   const hasDetails = Boolean(goal.description?.trim() || goal.subtasks.length > 0);
 
   return (
-    <article className={`goal-card ${isCompleted ? "is-completed" : ""} ${overdue ? "is-overdue" : ""}`}>
+    <article className={`goal-card ${finishing ? "is-finishing" : ""} ${isCompleted ? "is-completed" : ""} ${overdue ? "is-overdue" : ""}`}>
       <div className="goal-card-main">
         <button
           type="button"
-          className={`goal-complete-button ${isCompleted ? "is-checked" : ""}`}
-          aria-label={isCompleted ? `Вернуть цель: ${goal.title}` : `Завершить цель: ${goal.title}`}
-          onClick={() => onToggleComplete(goal.id)}
+          className={`goal-complete-button ${isCompleted || finishing ? "is-checked" : ""}`}
+          disabled={finishing}
+          aria-label={isCompleted ? `Вернуть задачу: ${goal.title}` : `Завершить задачу: ${goal.title}`}
+          title={isCompleted ? "Вернуть в работу" : "Отметить выполненной"}
+          onClick={() => isCompleted ? onToggleComplete(goal.id) : finishWithAnimation(() => onToggleComplete(goal.id))}
         >
-          <span className="goal-complete-indicator">{isCompleted && <Check size={12} strokeWidth={2.8} />}</span>
+          <span className="goal-complete-indicator"><Check size={16} strokeWidth={2.8} /></span>
+          {finishing && <span className="goal-completion-burst" aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <i key={i} style={{ "--burst-angle": `${i * 60}deg` } as React.CSSProperties} />)}</span>}
           <span className="goal-complete-label">{isCompleted ? "Вернуть" : "Выполнить"}</span>
         </button>
+
+        <span className="planner-task-icon" aria-hidden="true" style={{ "--task-tone": PRIORITY_COLORS[goal.priority] } as React.CSSProperties}>{isCompleted ? <Check size={21} /> : <Target size={23} />}</span>
 
         <div className="goal-card-body">
           <div className="goal-card-title-row">
@@ -3265,23 +3358,25 @@ function GoalCard({
               {(hasDetails || isCompleted) && <ChevronDown size={15} className={`goal-card-disclosure ${expanded ? "is-open" : ""}`} />}
             </button>
             <div className="goal-card-actions">
-              {!isCompleted && <button type="button" className="goal-action-button goal-edit-action" aria-label={`Редактировать цель: ${goal.title}`} onClick={() => onEdit(goal)}><Pencil size={14} /><span>Изменить</span></button>}
-              <button type="button" className="goal-action-button goal-more-action" aria-label={`Ещё действия с целью: ${goal.title}`} title="Ещё действия" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value); setDeleteConfirm(false); }}><MoreHorizontal size={17} /></button>
+              {!isCompleted && <button type="button" className="goal-action-button goal-edit-action" aria-label={`Редактировать задачу: ${goal.title}`} onClick={() => onEdit(goal)}><Pencil size={14} /><span>Изменить</span></button>}
+              <button type="button" className="goal-action-button goal-more-action" aria-label={`Ещё действия с задачей: ${goal.title}`} title="Ещё действия" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value); setDeleteConfirm(false); }}><MoreHorizontal size={17} /></button>
               {menuOpen && (
                 <div className="goal-card-menu" role="menu">
                   {!isCompleted && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onEdit(goal); }}><Pencil size={14} />Редактировать</button>}
                   <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onArchive(goal.id); }}><IcoArchive />Переместить в архив</button>
-                  <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); setDeleteConfirm(true); }}><Trash2 size={14} />Удалить цель</button>
+                  <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); setDeleteConfirm(true); }}><Trash2 size={14} />Удалить задачу</button>
                 </div>
               )}
             </div>
           </div>
 
+          {!expanded && goal.description?.trim() && <p className="planner-task-preview">{goal.description}</p>}
+
           <div className="goal-card-meta">
             <span className={`goal-status-chip ${isCompleted ? "is-completed" : overdue ? "is-overdue" : ""}`}>
               <i />{isCompleted ? "Выполнена" : overdue ? "Просрочена" : "В работе"}
             </span>
-            <span className="goal-priority-chip" style={{ "--goal-priority": priorityColor } as React.CSSProperties}><i />{PRIORITY_LABELS[goal.priority]} приоритет</span>
+            <span className="goal-priority-chip" style={{ "--goal-priority": priorityColor, "--goal-priority-ink": overdue ? "#A33737" : PRIORITY_INK[goal.priority] } as React.CSSProperties}><i />{PRIORITY_LABELS[goal.priority]} приоритет</span>
             <span className="goal-group-chip">{GROUP_LABELS[goal.group]}</span>
             {dueLabel && <span className={`goal-meta-detail ${overdue && !isCompleted ? "is-overdue" : ""}`}><CalendarDays size={13} />До {dueLabel}</span>}
             {recurrenceLabel && <span className="goal-meta-detail"><Clock3 size={13} />{recurrenceLabel}</span>}
@@ -3292,30 +3387,32 @@ function GoalCard({
 
       {goal.subtasks.length > 0 && (
         <div className="goal-card-progress">
-          <div className="goal-progress-heading"><span>Шаги к цели</span><b>{completedSubtasks} из {goal.subtasks.length}</b></div>
+          <div className="goal-progress-heading"><span>Подзадачи</span><b>{completedSubtasks} из {goal.subtasks.length}</b></div>
           <div className="goal-progress-track"><i style={{ width: `${progress}%` }} /></div>
+          <div className="goal-subtask-list" aria-label={`Подзадачи: ${goal.title}`}>
+            {goal.subtasks.map(subtask => {
+              const checked = subtask.done || pendingSubtask === subtask.id;
+              return <button key={subtask.id} type="button" className={`goal-subtask-row ${checked ? "is-done" : ""}`} role="checkbox" aria-checked={checked} disabled={finishing} onClick={() => toggleStep(subtask)}>
+                <span className="goal-subtask-check" aria-hidden="true"><motion.svg viewBox="0 0 20 20" width="16" height="16"><motion.path d="M4 10l4 4 8-8" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" initial={false} animate={{ pathLength: checked ? 1 : 0, opacity: checked ? 1 : 0 }} transition={{ duration: reduceMotion ? 0 : .2 }} /></motion.svg></span>
+                <span>{subtask.title}</span>
+              </button>;
+            })}
+          </div>
+          {!isCompleted && <p className="goal-subtask-hint">Все шаги выполнены — задача завершится автоматически</p>}
         </div>
       )}
 
       {expanded && !isCompleted && (
         <div className="goal-card-details">
           {goal.description?.trim() && <p className="goal-description">{goal.description}</p>}
-          {goal.subtasks.length > 0 ? (
-            <div className="goal-subtask-list">
-              {goal.subtasks.map(subtask => (
-                <button key={subtask.id} type="button" className={`goal-subtask-row ${subtask.done ? "is-done" : ""}`} aria-pressed={subtask.done} aria-label={`${subtask.done ? "Снять отметку" : "Отметить"}: ${subtask.title}`} onClick={() => onToggleSubtask(goal.id, subtask.id)}>
-                  <span className="goal-subtask-check">{subtask.done && <Check size={13} strokeWidth={2.8} />}</span><span>{subtask.title}</span>
-                </button>
-              ))}
-            </div>
-          ) : <p className="goal-no-subtasks">Разбей цель на небольшие шаги, чтобы проще было начать.</p>}
+          {!hasDetails && <p className="goal-no-subtasks">Добавь описание или подзадачи, чтобы проще было начать.</p>}
           {!hasDetails && <button type="button" className="goal-inline-edit" onClick={() => onEdit(goal)}>Добавить описание или шаги <Pencil size={13} /></button>}
         </div>
       )}
 
       {deleteConfirm && (
         <div className="goal-delete-confirm" role="group" aria-label={`Подтверждение удаления: ${goal.title}`}>
-          <div><b>Удалить цель?</b><span>Это действие нельзя отменить.</span></div>
+          <div><b>Удалить задачу?</b><span>Это действие нельзя отменить.</span></div>
           <button type="button" className="goal-cancel-delete" onClick={() => setDeleteConfirm(false)}>Отмена</button>
           {goal.recurring !== "none" && goal.recurrenceSeriesId ? (
             <>
@@ -4555,7 +4652,7 @@ function SettingsScreen({
 const TABS: { id: AppTab; label: string }[] = [
   { id: "home",      label: "Главная"  },
   { id: "work",      label: "Работа"   },
-  { id: "goals",     label: "Цели"     },
+  { id: "goals",     label: "Задачи"     },
   { id: "nutrition", label: "Питание"  },
   { id: "habits",    label: "Зависимости" },
 ];

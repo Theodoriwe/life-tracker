@@ -1736,7 +1736,7 @@ body::-webkit-scrollbar,
   --goal-muted: #7c899b;
   --goal-line: #e6ebf1;
   --goal-surface: #fff;
-  width: min(100%, 1280px);
+  width: min(100%, 1400px);
   padding-inline: clamp(18px, 3vw, 40px) !important;
   padding-bottom: max(32px, env(safe-area-inset-bottom)) !important;
   color: var(--goal-ink);
