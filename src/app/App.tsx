@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { AreaChart, Area, Bar, BarChart, CartesianGrid, Cell, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { ArrowUpRight, BarChart3, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Flame, Heart, MoreHorizontal, Pencil, Pill as PillIcon, Plus, Sparkles, Target, Trash2, TrendingUp, Undo2, Utensils, X } from "lucide-react";
+import { ArrowUpRight, BarChart3, Bike, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Dumbbell, Flame, Heart, House, MoreHorizontal, Pencil, Pill as PillIcon, Plus, ShoppingBag, Sparkles, Target, Trash2, TrendingUp, Undo2, Utensils, X, type LucideIcon } from "lucide-react";
 import { Slider } from "./components/ui/slider";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "./components/ui/chart";
 import { supabase } from "../lib/supabase";
@@ -47,6 +47,8 @@ interface Settings {
 interface Medication {
   id: string;
   name: string;
+  shape?: MedicationShape;
+  doseUnit?: MedicationDoseUnit;
   unitsPerDose: number;
   frequency: "daily" | "interval";
   times: string[];
@@ -55,7 +57,16 @@ interface Medication {
   startDate: string;
 }
 
+type MedicationShape = "capsule" | "round" | "oval" | "scored" | "drop";
+type MedicationDoseUnit = "tablets" | "drops";
 type MedicationDraft = Omit<Medication, "id">;
+const MEDICATION_SHAPES: { id: MedicationShape; label: string }[] = [
+  { id: "capsule", label: "Капсула" },
+  { id: "round", label: "Круглая" },
+  { id: "oval", label: "Овальная" },
+  { id: "scored", label: "С риской" },
+  { id: "drop", label: "Капля" },
+];
 
 interface WorkSession {
   id: string;
@@ -78,9 +89,11 @@ interface GoalRecurrenceState {
 interface Goal {
   id: string;
   title: string;
+  icon?: string;
   description?: string;
   createdAt?: string;
   deadline: string | null;
+  time?: string | null;
   priority: Priority;
   group: GoalGroup;
   scheduledFor: string | null;
@@ -94,6 +107,8 @@ interface Goal {
   recurrenceState?: Record<string, GoalRecurrenceState>;
   recurrenceSeriesId?: string;
   recurrencePattern?: RecurringType;
+  recurrenceEndDate?: string | null;
+  recurrenceSkippedDates?: string[];
 }
 
 interface FoodItem {
@@ -210,6 +225,17 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 
 const PRIORITY_INK: Record<Priority, string> = { high: "#285EA4", medium: "#526514", low: "#45516A" };
 
+const TASK_ICONS: { id: string; label: string; Icon: LucideIcon }[] = [
+  { id: "target", label: "Общее", Icon: Target },
+  { id: "work", label: "Работа", Icon: BriefcaseBusiness },
+  { id: "shop", label: "Покупки", Icon: ShoppingBag },
+  { id: "home", label: "Дом", Icon: House },
+  { id: "sport", label: "Спорт", Icon: Dumbbell },
+  { id: "bike", label: "Прогулка", Icon: Bike },
+  { id: "health", label: "Здоровье", Icon: Heart },
+  { id: "food", label: "Питание", Icon: Utensils },
+];
+
 const PRIORITY_LABELS: Record<Priority, string> = {
   high: "Высокий",
   medium: "Средний",
@@ -281,6 +307,9 @@ function getPreviousDateKey(dateKey: string): string {
 
 function isGoalRecurringVisibleForDate(goal: Goal, dateKey: string): boolean {
   if (goal.recurring === "none") return false;
+
+  if (goal.recurrenceEndDate && dateKey > goal.recurrenceEndDate) return false;
+  if (goal.recurrenceSkippedDates?.includes(dateKey)) return false;
 
   const createdKey = goal.createdAt ?? goal.scheduledFor ?? dateKey;
   if (dateKey < createdKey) return false;
@@ -414,6 +443,8 @@ function formatDate(d: Date = new Date()): string {
 function createMedicationDraft(): MedicationDraft {
   return {
     name: "",
+    shape: "capsule",
+    doseUnit: "tablets",
     unitsPerDose: 1,
     frequency: "daily",
     times: ["09:00"],
@@ -423,11 +454,53 @@ function createMedicationDraft(): MedicationDraft {
   };
 }
 
-function formatMedicationDose(amount: number): string {
+function MedicationPillFigure({ shape = "capsule", taken, preview = false }: { shape?: MedicationShape; taken: boolean; preview?: boolean }) {
+  const reduceMotion = useReducedMotion();
+  const fill = taken ? "#549af2" : "#ffffff";
+  const stroke = taken ? "#397fda" : "#8ba7cc";
+  const common = { fill, stroke, strokeWidth: 1.8, transition: { duration: reduceMotion ? 0 : 0.24 } };
+  return (
+    <motion.span
+      className={`medication-pill-figure ${preview ? "is-preview" : ""} ${taken ? "is-taken" : ""}`}
+      aria-hidden="true"
+      initial={false}
+      animate={{ scale: taken && !reduceMotion ? [1, 1.15, 1] : 1, rotate: taken && !reduceMotion ? [0, -5, 0] : 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.34, ease: "easeOut" }}
+    >
+      <svg viewBox="0 0 56 36" fill="none">
+        {shape === "capsule" && <>
+          <motion.rect x="4" y="7" width="48" height="22" rx="11" {...common} />
+          <path d="M28 7v22" stroke={taken ? "#ffffff" : "#8ba7cc"} strokeWidth="1.5" opacity={taken ? .9 : .72} />
+        </>}
+        {shape === "round" && <>
+          <motion.circle cx="28" cy="18" r="13" {...common} />
+          <path d="m20 25 16-14" stroke={taken ? "#ffffff" : "#8ba7cc"} strokeWidth="1.5" strokeLinecap="round" opacity={taken ? .9 : .7} />
+        </>}
+        {shape === "oval" && <>
+          <motion.ellipse cx="28" cy="18" rx="23" ry="12" {...common} />
+          <path d="M28 6v24" stroke={taken ? "#ffffff" : "#8ba7cc"} strokeWidth="1.5" opacity={taken ? .9 : .72} />
+        </>}
+        {shape === "scored" && <>
+          <motion.rect x="8" y="5" width="40" height="26" rx="8" {...common} />
+          <path d="M15 18h26" stroke={taken ? "#ffffff" : "#8ba7cc"} strokeWidth="1.5" strokeLinecap="round" opacity={taken ? .9 : .72} />
+        </>}
+        {shape === "drop" && <>
+          <motion.path d="M28 3.5C23.4 10.1 15.2 18.5 15.2 24.4c0 6.3 5.4 9.4 12.8 9.4s12.8-3.1 12.8-9.4C40.8 18.5 32.6 10.1 28 3.5Z" {...common} />
+          {!taken && <path d="M23 23c.4-2.2 1.8-4.3 3.5-6.3" stroke="#8ba7cc" strokeWidth="1.5" strokeLinecap="round" opacity=".72" />}
+        </>}
+        {taken && <motion.path d="m22 18 4 4 8-9" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" initial={false} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: reduceMotion ? 0 : .2, delay: reduceMotion ? 0 : .06 }} />}
+      </svg>
+    </motion.span>
+  );
+}
+
+function formatMedicationDose(amount: number, unit: MedicationDoseUnit = "tablets"): string {
   const value = Math.max(1, Math.floor(amount));
   const lastTwo = value % 100;
   const last = value % 10;
-  const noun = lastTwo >= 11 && lastTwo <= 14 ? "таблеток" : last === 1 ? "таблетка" : last >= 2 && last <= 4 ? "таблетки" : "таблеток";
+  const noun = unit === "drops"
+    ? lastTwo >= 11 && lastTwo <= 14 ? "капель" : last === 1 ? "капля" : last >= 2 && last <= 4 ? "капли" : "капель"
+    : lastTwo >= 11 && lastTwo <= 14 ? "таблеток" : last === 1 ? "таблетка" : last >= 2 && last <= 4 ? "таблетки" : "таблеток";
   return `${value} ${noun}`;
 }
 
@@ -998,9 +1071,9 @@ function ProgressRing({
 }
 
 function BottomSheet({
-  open, onClose, title, children,
+  open, onClose, title, children, className = "",
 }: {
-  open: boolean; onClose: () => void; title?: string; children: React.ReactNode;
+  open: boolean; onClose: () => void; title?: string; children: React.ReactNode; className?: string;
 }) {
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
@@ -1010,7 +1083,7 @@ function BottomSheet({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+    <div className={`fixed inset-0 z-50 flex flex-col justify-end ${className}`}>
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
       <div
         className="relative bg-white rounded-t-2xl flex flex-col max-h-[92vh]"
@@ -1413,32 +1486,45 @@ function HomeTab({
               <button onClick={onOpenSettings}>Настроить <ArrowUpRight size={15} /></button>
             </div>
           ) : (
-            <div className="medication-cards-grid">
-              {medicationsForToday.map(({ medication, times, nextDateKey }) => (
-                <article className="medication-card" key={medication.id}>
-                  <header className="medication-card-header">
-                    <span className="medication-card-icon"><PillIcon size={17} /></span>
-                    <div className="medication-card-title"><b>{medication.name}</b><small>{formatMedicationDose(medication.unitsPerDose)} за приём</small></div>
-                    <span className="medication-schedule-label">{medication.frequency === "daily" ? `${times.length} ${times.length === 1 ? "раз" : "раза"} сегодня` : `Раз в ${formatDaysInterval(medication.intervalDays)}`}</span>
-                  </header>
-                  {times.length > 0 ? (
-                    <div className="medication-dose-list">
-                      {times.map(time => {
-                        const taken = medicationLogForToday.includes(getMedicationDoseKey(medication.id, time));
-                        return (
-                          <button key={time} className={`medication-dose-row ${taken ? "is-taken" : ""}`} onClick={() => handleMedicationDose(medication.id, time)} aria-pressed={taken} aria-label={`${taken ? "Отменить отметку" : "Отметить приём"}: ${medication.name}, ${time}`}>
-                            <span className="medication-dose-capsule" aria-hidden="true"><svg viewBox="0 0 34 20"><rect x="1" y="1" width="32" height="18" rx="9" /><path d="M17 1v18" /></svg>{taken && <Check size={12} />}</span>
-                            <span className="medication-dose-copy"><b>{time}</b><small>{formatMedicationDose(medication.unitsPerDose)}</small></span>
-                            <span className="medication-dose-status">{taken ? "Принято" : "Отметить"}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="medication-next-dose">Следующий приём <b>{new Date(`${nextDateKey}T12:00:00`).toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" })} · {medication.intervalTime}</b></p>
-                  )}
-                </article>
-              ))}
+            <div className="medication-pillboard">
+              {scheduledMedicationCount > 0 && (
+                <div className="medication-pillboard-progress" aria-label={`Принято ${takenMedicationCount} из ${scheduledMedicationCount} приёмов`}>
+                  <div className="medication-pillboard-progress-copy"><span>Прогресс за день</span><small>Нажми на таблетку, чтобы отметить приём</small></div>
+                  <div className="medication-pillboard-progress-track"><i style={{ width: `${Math.round(takenMedicationCount / scheduledMedicationCount * 100)}%` }} /></div>
+                </div>
+              )}
+              <div className="medication-pillboard-list">
+                {medicationsForToday.map(({ medication, times, nextDateKey }) => (
+                  <article className="medication-pillboard-card" key={medication.id}>
+                    <header className="medication-pillboard-header">
+                      <span className="medication-pillboard-brand"><MedicationPillFigure shape={medication.shape} taken={false} preview /></span>
+                      <span className="medication-pillboard-name"><b>{medication.name}</b><small>{formatMedicationDose(medication.unitsPerDose, medication.doseUnit)} за приём</small></span>
+                      {times.length > 0 && <span className="medication-pillboard-frequency">{times.length} {times.length === 1 ? "приём" : times.length < 5 ? "приёма" : "приёмов"}</span>}
+                    </header>
+                    {times.length > 0 ? (
+                      <div className="medication-dose-tiles" aria-label={`Приёмы препарата ${medication.name}`}>
+                        {[...times].sort().map(time => {
+                          const taken = medicationLogForToday.includes(getMedicationDoseKey(medication.id, time));
+                          return (
+                            <div key={time} className={`medication-dose-tile ${taken ? "is-taken" : ""}`}>
+                              <time>{time}</time>
+                              <button type="button" className="medication-pill-button" onClick={() => handleMedicationDose(medication.id, time)} aria-pressed={taken} aria-label={`${taken ? "Отменить отметку" : "Отметить приём"}: ${medication.name}, ${time}`}>
+                                <MedicationPillFigure shape={medication.shape} taken={taken} />
+                              </button>
+                              <span className="medication-dose-tile-state">{taken ? <><Check size={12} /> Принято</> : "Нажми на таблетку"}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="medication-next-dose-tile">
+                        <span className="medication-next-dose-figure"><MedicationPillFigure shape={medication.shape} taken={false} /></span>
+                        <span><small>Следующий приём</small><b>{new Date(`${nextDateKey}T12:00:00`).toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" })} · {medication.intervalTime}</b></span>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
             </div>
           )}
         </DashboardPanel>
@@ -2040,7 +2126,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   }, [todayKey, setData]);
 
   const newGoal = (): Partial<Goal> => ({
-    title: "", description: "", deadline: null, priority: "medium", group: group === "all" ? "today" : group, scheduledFor: selectedDate, subtasks: [], recurring: "none",
+    title: "", icon: "target", description: "", deadline: null, time: null, priority: "medium", group: group === "all" ? "today" : group, scheduledFor: selectedDate, subtasks: [], recurring: "none",
   });
   const [draft, setDraft] = useState<Partial<Goal>>(newGoal());
   const [newSubtask, setNewSubtask] = useState("");
@@ -2118,6 +2204,8 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
     const aCompleted = isGoalCompletedForDate(a, selectedDate);
     const bCompleted = isGoalCompletedForDate(b, selectedDate);
     if (aCompleted !== bCompleted) return Number(aCompleted) - Number(bCompleted);
+    if (a.time && b.time && a.time !== b.time) return a.time.localeCompare(b.time);
+    if (Boolean(a.time) !== Boolean(b.time)) return a.time ? -1 : 1;
     if (!aCompleted && !bCompleted) {
       const priorityDiff = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
       if (priorityDiff !== 0) return priorityDiff;
@@ -2217,23 +2305,54 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   };
 
   const handleDelete = (id: string, mode: "single" | "series" = "single") => {
-    setData(prev => ({
-      ...prev,
-      goals: prev.goals.filter(g => {
-        if (g.id !== id) {
-          if (mode === "series" && g.recurring !== "none" && g.recurrenceSeriesId && g.recurrenceSeriesId === prev.goals.find(item => item.id === id)?.recurrenceSeriesId && g.scheduledFor && g.scheduledFor >= (prev.goals.find(item => item.id === id)?.scheduledFor ?? selectedDate)) {
-            return false;
-          }
-          return true;
-        }
+    setData(prev => {
+      const target = prev.goals.find(goal => goal.id === id);
+      if (!target) return prev;
 
-        if (mode === "series" && g.recurring !== "none" && g.recurrenceSeriesId) {
-          return false;
-        }
+      if (target.recurring === "none") {
+        return { ...prev, goals: prev.goals.filter(goal => goal.id !== id) };
+      }
 
-        return false;
-      }),
-    }));
+      if (mode === "single") {
+        // Materialized series have one record per occurrence; legacy series use one record
+        // with recurrence state, so mark just this date as skipped for those.
+        if (target.recurrenceSeriesId) {
+          return { ...prev, goals: prev.goals.filter(goal => goal.id !== id) };
+        }
+        const skipped = new Set(target.recurrenceSkippedDates ?? []);
+        skipped.add(selectedDate);
+        return {
+          ...prev,
+          goals: prev.goals.map(goal => goal.id === id
+            ? { ...goal, recurrenceSkippedDates: [...skipped] }
+            : goal),
+        };
+      }
+
+      if (target.recurrenceSeriesId) {
+        const cutoffDate = target.scheduledFor ?? selectedDate;
+        return {
+          ...prev,
+          goals: prev.goals.filter(goal => goal.recurrenceSeriesId !== target.recurrenceSeriesId
+            || !goal.scheduledFor
+            || goal.scheduledFor < cutoffDate),
+        };
+      }
+
+      // Keep earlier history for legacy (non-materialized) recurring tasks and stop
+      // generating occurrences after the day before the selected occurrence.
+      const seriesStart = target.createdAt ?? target.scheduledFor ?? selectedDate;
+      const hasEarlierHistory = Object.keys(target.recurrenceState ?? {}).some(date => date < selectedDate);
+      if (seriesStart >= selectedDate && !hasEarlierHistory) {
+        return { ...prev, goals: prev.goals.filter(goal => goal.id !== id) };
+      }
+      return {
+        ...prev,
+        goals: prev.goals.map(goal => goal.id === id
+          ? { ...goal, recurrenceEndDate: getPreviousDateKey(selectedDate) }
+          : goal),
+      };
+    });
   };
 
   const handleArchive = (id: string) => {
@@ -2280,6 +2399,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
         ...goal,
         description: goal.description ?? "",
         deadline: goal.deadline ?? null,
+        time: goal.time ?? null,
         scheduledFor: goal.scheduledFor ?? selectedDate,
         subtasks: [...goal.subtasks],
       });
@@ -2317,8 +2437,10 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
             ? {
                 ...g,
                 title: draft.title?.trim() ?? g.title,
+                icon: draft.icon ?? g.icon,
                 description: draft.description?.trim() ?? "",
                 deadline: draft.deadline ?? null,
+                time: draft.time ?? null,
                 priority: draft.priority ?? g.priority,
                 group: draft.group ?? g.group,
                 scheduledFor: draft.scheduledFor ?? g.scheduledFor ?? selectedDate,
@@ -2332,9 +2454,11 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
       const baseGoal: Goal = {
         id: uid(),
         title: draft.title.trim(),
+        icon: draft.icon ?? "target",
         description: draft.description?.trim() ?? "",
         createdAt: getDateKey(),
         deadline: draft.deadline ?? null,
+        time: draft.time ?? null,
         priority: draft.priority ?? "medium",
         group: draft.group ?? (group === "all" ? "today" : group),
         scheduledFor: draft.scheduledFor ?? selectedDate,
@@ -2516,7 +2640,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
                   <div><span className="goal-group-dot" /><h2>{getGoalGroupLabel(section.key, selectedDate, todayKey)}</h2><span>{section.todos.length}</span></div>
                   <p>{`${section.todos.length} ${getGoalCountWord(section.todos.length)} в работе`}</p>
                 </div>
-                <div className="goal-card-grid">
+                <div className={`goal-card-grid ${section.todos.some(goal => goal.time) ? "has-scheduled-times" : ""}`}>
                   <AnimatePresence mode="popLayout">
                     {section.todos.map(goal => (
                       <motion.div key={goal.id} layout initial={{ opacity: 0, y: 12, scale: .99 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: .98 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
@@ -2534,7 +2658,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
                   <p>{completedGoals.length ? "Можно открыть или вернуть" : "Выполненные задачи будут здесь"}</p>
                 </div>
                 {completedGoals.length > 0 ? (
-                  <div className="goal-card-grid goal-card-grid-completed">
+                  <div className={`goal-card-grid goal-card-grid-completed ${completedGoals.some(goal => goal.time) ? "has-scheduled-times" : ""}`}>
                     <AnimatePresence mode="popLayout">
                       {completedGoals.map(goal => (
                         <motion.div key={goal.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
@@ -2575,43 +2699,69 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
       <button type="button" onClick={() => openGoalEditor()} className="goals-fab" aria-label="Добавить задачу"><Plus size={22} /><span>Новая задача</span></button>
 
       {/* Goal editor sheet */}
-      <BottomSheet open={showAddSheet} onClose={closeGoalEditor} title={editingGoalId ? "Редактировать задачу" : "Новая задача"}>
-        <div className="goals-editor-content px-5 py-4 space-y-4">
-          <div>
-            <label className="text-[12px] text-[#8A8A99] font-medium block mb-1.5">Название</label>
+      <BottomSheet className="goal-editor-sheet" open={showAddSheet} onClose={closeGoalEditor} title={editingGoalId ? "Редактировать задачу" : "Новая задача"}>
+        <div className="goals-editor-content">
+          <section className="goal-editor-section goal-editor-basics">
+            <div className="goal-editor-section-heading"><span className="goal-editor-step">1</span><div><h3>Основное</h3><p>Что нужно сделать?</p></div></div>
+            <div className="goal-editor-field">
+            <label htmlFor="goal-title-input">Название задачи</label>
             <input
               ref={titleInputRef}
-              className="w-full bg-[#F0F0EE] rounded-xl px-4 py-3 text-[#1A1A2E] text-[15px] outline-none placeholder:text-[#C0C0C0]"
-              placeholder="Чего вы хотите достичь?"
+              id="goal-title-input"
+              className="goal-editor-input"
+              placeholder="Например, купить продукты"
               value={draft.title ?? ""}
               onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[12px] text-[#8A8A99] font-medium block">Описание <span>(необязательно)</span></label>
+          <div className="goal-editor-field">
+            <label htmlFor="goal-description-input">Заметка <span>· необязательно</span></label>
             <textarea
-              className="w-full bg-[#F0F0EE] rounded-xl px-4 py-3 text-[#1A1A2E] text-[14px] outline-none placeholder:text-[#C0C0C0] min-h-[84px] resize-none"
-              placeholder="Добавьте детали или заметки"
+              id="goal-description-input"
+              className="goal-editor-input goal-editor-textarea"
+              placeholder="Добавь подробности, если нужно"
               value={draft.description ?? ""}
               onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
             />
           </div>
+          </section>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[12px] text-[#8A8A99] font-medium block mb-1.5">Дедлайн</label>
+          <section className="goal-editor-section">
+            <div className="goal-editor-section-heading"><span className="goal-editor-step">2</span><div><h3>Иконка</h3><p>Помогает быстрее найти задачу</p></div></div>
+            <div className="goal-icon-picker" role="radiogroup" aria-label="Иконка задачи">
+              {TASK_ICONS.map(({ id, label, Icon }) => <button key={id} type="button" role="radio" aria-checked={(draft.icon ?? "target") === id} aria-label={label} title={label} className={`goal-icon-option ${(draft.icon ?? "target") === id ? "is-selected" : ""}`} onClick={() => setDraft(d => ({ ...d, icon: id }))}><Icon size={19} /><span>{label}</span></button>)}
+            </div>
+          </section>
+
+          <section className="goal-editor-section">
+            <div className="goal-editor-section-heading"><span className="goal-editor-step">3</span><div><h3>Срок и список</h3><p>Когда и в какой области</p></div></div>
+            <div className="goal-editor-grid">
+            <div className="goal-editor-field">
+              <label htmlFor="goal-deadline-input">Срок <span>· необязательно</span></label>
               <input
+                id="goal-deadline-input"
                 type="date"
-                className="w-full bg-[#F0F0EE] rounded-xl px-3 py-2.5 text-[#1A1A2E] text-[13px] outline-none"
+                className="goal-editor-input"
                 value={draft.deadline ?? ""}
                 onChange={e => setDraft(d => ({ ...d, deadline: e.target.value || null }))}
               />
             </div>
-            <div>
-              <label className="text-[12px] text-[#8A8A99] font-medium block mb-1.5">Группа</label>
+            <div className="goal-editor-field">
+              <label htmlFor="goal-time-input">Время <span>· необязательно</span></label>
+              <input
+                id="goal-time-input"
+                type="time"
+                className="goal-editor-input"
+                value={draft.time ?? ""}
+                onChange={e => setDraft(d => ({ ...d, time: e.target.value || null }))}
+              />
+            </div>
+            <div className="goal-editor-field">
+              <label htmlFor="goal-group-select">Список</label>
               <select
-                className="w-full bg-[#F0F0EE] rounded-xl px-3 py-2.5 text-[#1A1A2E] text-[13px] outline-none"
+                id="goal-group-select"
+                className="goal-editor-input"
                 value={draft.group ?? (group === "all" ? "today" : group)}
                 onChange={e => setDraft(d => ({ ...d, group: e.target.value as GoalGroup }))}
               >
@@ -2621,70 +2771,74 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
               </select>
             </div>
           </div>
+          </section>
 
-          <div>
-            <label className="text-[12px] text-[#8A8A99] font-medium block mb-1.5">Приоритет</label>
-            <div className="flex gap-2">
+          <section className="goal-editor-section">
+            <div className="goal-editor-section-heading"><span className="goal-editor-step">4</span><div><h3>Важность</h3><p>Выбери один уровень приоритета</p></div></div>
+            <div className="goal-priority-picker" role="radiogroup" aria-label="Приоритет задачи">
               {(["high", "medium", "low"] as Priority[]).map(p => (
                 <button
                   key={p}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.priority === p}
                   onClick={() => setDraft(d => ({ ...d, priority: p }))}
-                  className={`flex-1 py-2 rounded-xl text-[12px] font-medium transition-all active:scale-95 border ${
-                    draft.priority === p ? "border-transparent text-white" : "border-[#E8E8E6] text-[#8A8A99]"
-                  }`}
-                  style={draft.priority === p ? { background: `${PRIORITY_COLORS[p]}15`, color: PRIORITY_INK[p], borderColor: PRIORITY_COLORS[p] } : undefined}
+                  className={`goal-priority-option ${draft.priority === p ? "is-selected" : ""}`}
                 >
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ background: PRIORITY_COLORS[p] }} />
-                    {PRIORITY_LABELS[p]}
-                  </span>
+                  <span className="goal-priority-dot" style={{ background: PRIORITY_COLORS[p] }} />
+                  <span>{PRIORITY_LABELS[p]}<small>{p === "high" ? "Сделать в первую очередь" : p === "medium" ? "Обычная важность" : "Можно отложить"}</small></span>
+                  {draft.priority === p && <Check size={16} />}
                 </button>
               ))}
             </div>
-          </div>
+          </section>
 
-          <div>
-            <label className="text-[12px] text-[#8A8A99] font-medium block mb-1.5">Повторение</label>
-            <div className="goals-repeat-options flex gap-2">
+          <section className="goal-editor-section">
+            <div className="goal-editor-section-heading"><span className="goal-editor-step">5</span><div><h3>Повтор</h3><p>Выбери только один вариант</p></div></div>
+            <div className="goals-repeat-options" role="radiogroup" aria-label="Повторение задачи">
               {(["none", "daily", "weekly"] as RecurringType[]).map(r => (
-                <Pill key={r} active={draft.recurring === r} onClick={() => setDraft(d => ({ ...d, recurring: r }))}>
-                  {r === "none" ? "Нет" : r === "daily" ? "Ежедневно" : "Еженедельно"}
-                </Pill>
+                <button key={r} type="button" role="radio" aria-checked={draft.recurring === r} disabled={Boolean(editingGoalId && (draft.recurring === "daily" || draft.recurring === "weekly") && r !== draft.recurring)} className={`goal-repeat-option ${draft.recurring === r ? "is-selected" : ""}`} onClick={() => setDraft(d => ({ ...d, recurring: r }))}>
+                  <span className="goal-repeat-radio" />
+                  <span><b>{r === "none" ? "Без повтора" : r === "daily" ? "Ежедневно" : "Еженедельно"}</b><small>{r === "none" ? "Только один раз" : r === "daily" ? "Новая задача на каждый день" : "Новая задача раз в неделю"}</small></span>
+                </button>
               ))}
             </div>
-          </div>
+            {editingGoalId && (draft.recurring === "daily" || draft.recurring === "weekly") && <p className="goal-repeat-note">Это задача из серии. Чтобы не менять остальные даты в серии, режим повтора здесь фиксирован.</p>}
+          </section>
 
-          <div>
-            <label className="text-[12px] text-[#8A8A99] font-medium block mb-1.5">Подзадачи</label>
-            <div className="space-y-2 mb-2">
+          <section className="goal-editor-section">
+            <div className="goal-editor-section-heading"><span className="goal-editor-step">6</span><div><h3>Шаги задачи</h3><p>Разбей большое дело на небольшие</p></div></div>
+            <div className="goal-draft-subtasks">
               {(draft.subtasks ?? []).map(s => (
                 <div key={s.id} className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#C0C0C0] flex-shrink-0" />
-                  <span className="text-[13px] text-[#1A1A2E] flex-1">{s.title}</span>
+                  <span className="goal-draft-step-check"><Check size={13} /></span>
+                  <span>{s.title}</span>
                   <button
+                    type="button"
+                    aria-label={`Удалить шаг: ${s.title}`}
                     onClick={() => setDraft(d => ({ ...d, subtasks: (d.subtasks ?? []).filter(x => x.id !== s.id) }))}
-                    className="text-[#C0C0C0] p-1"
                   >
                     <IcoClose />
                   </button>
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="goal-add-subtask">
               <input
-                className="flex-1 bg-[#F0F0EE] rounded-xl px-3 py-2.5 text-[#1A1A2E] text-[13px] outline-none placeholder:text-[#C0C0C0]"
-                placeholder="Добавить подзадачу"
+                className="goal-editor-input"
+                aria-label="Название шага"
+                placeholder="Например, составить список"
                 value={newSubtask}
                 onChange={e => setNewSubtask(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") addDraftSubtask(); }}
               />
-              <button onClick={addDraftSubtask} className="w-10 h-10 rounded-xl bg-[#F0F0EE] flex items-center justify-center active:scale-95 transition-all">
-                <IcoPlus />
+              <button type="button" disabled={!newSubtask.trim()} onClick={addDraftSubtask} aria-label="Добавить шаг" className="goal-add-step-button">
+                <Plus size={18} /><span>Добавить шаг</span>
               </button>
             </div>
-          </div>
+          </section>
 
-          <div className="flex gap-2">
+          <div className="goal-editor-actions">
             {editingGoalId && (
               <button
                 onClick={handleCompleteFromEditor}
@@ -3332,9 +3486,11 @@ function GoalCard({
   const completedDateLabel = completedTimestamp && !Number.isNaN(completedTimestamp.getTime()) ? formatGoalDate(getDateKey(completedTimestamp)) : null;
   const recurrenceLabel = goal.recurring === "daily" ? "Каждый день" : goal.recurring === "weekly" ? "Каждую неделю" : null;
   const hasDetails = Boolean(goal.description?.trim() || goal.subtasks.length > 0);
+  const TaskIcon = TASK_ICONS.find(item => item.id === goal.icon)?.Icon ?? Target;
 
   return (
     <article className={`goal-card ${finishing ? "is-finishing" : ""} ${isCompleted ? "is-completed" : ""} ${overdue ? "is-overdue" : ""}`}>
+      {goal.time && <div className="planner-task-time"><Clock3 size={13} /><time dateTime={goal.time}>{goal.time}</time></div>}
       <div className="goal-card-main">
         <button
           type="button"
@@ -3349,7 +3505,7 @@ function GoalCard({
           <span className="goal-complete-label">{isCompleted ? "Вернуть" : "Выполнить"}</span>
         </button>
 
-        <span className="planner-task-icon" aria-hidden="true" style={{ "--task-tone": PRIORITY_COLORS[goal.priority] } as React.CSSProperties}>{isCompleted ? <Check size={21} /> : <Target size={23} />}</span>
+        <span className="planner-task-icon" aria-hidden="true" style={{ "--task-tone": PRIORITY_COLORS[goal.priority] } as React.CSSProperties}>{isCompleted ? <Check size={21} /> : <TaskIcon size={22} />}</span>
 
         <div className="goal-card-body">
           <div className="goal-card-title-row">
@@ -3387,7 +3543,7 @@ function GoalCard({
 
       {goal.subtasks.length > 0 && (
         <div className="goal-card-progress">
-          <div className="goal-progress-heading"><span>Подзадачи</span><b>{completedSubtasks} из {goal.subtasks.length}</b></div>
+          <div className="goal-progress-heading"><span>Шаги</span><b>{completedSubtasks} из {goal.subtasks.length}</b></div>
           <div className="goal-progress-track"><i style={{ width: `${progress}%` }} /></div>
           <div className="goal-subtask-list" aria-label={`Подзадачи: ${goal.title}`}>
             {goal.subtasks.map(subtask => {
@@ -3412,12 +3568,15 @@ function GoalCard({
 
       {deleteConfirm && (
         <div className="goal-delete-confirm" role="group" aria-label={`Подтверждение удаления: ${goal.title}`}>
-          <div><b>Удалить задачу?</b><span>Это действие нельзя отменить.</span></div>
+          <div>
+            <b>{goal.recurring !== "none" ? "Удалить повтор задачи?" : "Удалить задачу?"}</b>
+            <span>{goal.recurring !== "none" ? "Выбери: только этот день или этот день и все будущие повторы." : "Это действие нельзя отменить."}</span>
+          </div>
           <button type="button" className="goal-cancel-delete" onClick={() => setDeleteConfirm(false)}>Отмена</button>
-          {goal.recurring !== "none" && goal.recurrenceSeriesId ? (
+          {goal.recurring !== "none" ? (
             <>
-              <button type="button" className="goal-confirm-delete" onClick={() => onDelete(goal.id, "single")}>Только эту</button>
-              <button type="button" className="goal-confirm-delete is-series" onClick={() => onDelete(goal.id, "series")}>Все последующие</button>
+              <button type="button" className="goal-confirm-delete" onClick={() => onDelete(goal.id, "single")}>Только этот день</button>
+              <button type="button" className="goal-confirm-delete is-series" onClick={() => onDelete(goal.id, "series")}>Этот и будущие</button>
             </>
           ) : <button type="button" className="goal-confirm-delete" onClick={() => onDelete(goal.id)}>Удалить</button>}
         </div>
@@ -4433,6 +4592,8 @@ function SettingsScreen({
     if (!name) return;
     const normalizedDraft = {
       ...medicationDraft,
+      shape: medicationDraft.shape ?? "capsule",
+      doseUnit: medicationDraft.doseUnit ?? "tablets",
       name,
       unitsPerDose: Math.max(1, Math.floor(medicationDraft.unitsPerDose || 1)),
       intervalDays: Math.max(2, Math.floor(medicationDraft.intervalDays || 2)),
@@ -4447,7 +4608,7 @@ function SettingsScreen({
   };
 
   const editMedication = (medication: Medication) => {
-    setMedicationDraft({ ...medication, times: [...medication.times] });
+    setMedicationDraft({ ...medication, shape: medication.shape ?? "capsule", doseUnit: medication.doseUnit ?? "tablets", times: [...medication.times] });
     setEditingMedicationId(medication.id);
   };
   const hasDuplicateMedicationTimes = medicationDraft.frequency === "daily"
@@ -4577,8 +4738,8 @@ function SettingsScreen({
             <div className="medication-settings-list">
               {medications.map(medication => (
                 <div key={medication.id} className="medication-settings-item">
-                  <span className="medication-settings-icon"><PillIcon size={17} /></span>
-                  <span className="medication-settings-copy"><b>{medication.name}</b><small>{formatMedicationDose(medication.unitsPerDose)} · {describeMedicationSchedule(medication)}</small></span>
+                  <span className="medication-settings-icon"><MedicationPillFigure shape={medication.shape} taken={false} preview /></span>
+                  <span className="medication-settings-copy"><b>{medication.name}</b><small>{formatMedicationDose(medication.unitsPerDose, medication.doseUnit)} · {describeMedicationSchedule(medication)}</small></span>
                   <button onClick={() => editMedication(medication)} aria-label={`Изменить ${medication.name}`} className="medication-settings-edit">Изменить</button>
                   <button onClick={() => { setMedications(current => current.filter(item => item.id !== medication.id)); if (editingMedicationId === medication.id) resetMedicationDraft(); }} aria-label={`Удалить ${medication.name}`} className="medication-settings-delete"><X size={16} /></button>
                 </div>
@@ -4592,10 +4753,27 @@ function SettingsScreen({
               <span>Название</span>
               <input value={medicationDraft.name} onChange={event => setMedicationDraft(current => ({ ...current, name: event.target.value }))} placeholder="Например, Витамин D" />
             </label>
+            <div className="medication-shape-field">
+              <span>Форма таблетки</span>
+              <div className="medication-shape-picker" role="radiogroup" aria-label="Форма таблетки">
+                {MEDICATION_SHAPES.map(option => (
+                  <button key={option.id} type="button" role="radio" aria-checked={(medicationDraft.shape ?? "capsule") === option.id} className={`medication-shape-option ${(medicationDraft.shape ?? "capsule") === option.id ? "is-selected" : ""}`} onClick={() => setMedicationDraft(current => ({ ...current, shape: option.id }))}>
+                    <MedicationPillFigure shape={option.id} taken={false} preview />
+                    <span>{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="medication-form-grid">
               <label className="medication-form-field">
-                <span>Таблеток за приём</span>
-                <input type="number" min={1} max={99} value={medicationDraft.unitsPerDose} onChange={event => setMedicationDraft(current => ({ ...current, unitsPerDose: Number(event.target.value) }))} />
+                <span>Количество за приём</span>
+                <div className="medication-amount-input">
+                  <input type="number" min={1} max={999} value={medicationDraft.unitsPerDose} onChange={event => setMedicationDraft(current => ({ ...current, unitsPerDose: Number(event.target.value) }))} />
+                  <select aria-label="Единица дозировки" value={medicationDraft.doseUnit ?? "tablets"} onChange={event => setMedicationDraft(current => ({ ...current, doseUnit: event.target.value as MedicationDoseUnit }))}>
+                    <option value="tablets">таблеток</option>
+                    <option value="drops">капель</option>
+                  </select>
+                </div>
               </label>
               <label className="medication-form-field">
                 <span>Расписание</span>

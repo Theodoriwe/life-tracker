@@ -184,6 +184,99 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   @keyframes gauge-appear { from { opacity: .15; } to { opacity: 1; } }
 }
 
+/* Task editor: clear, single-choice controls with readable labels. */
+.planner-v2 .goal-editor-sheet { align-items: center; }
+.planner-v2 .goal-editor-sheet > .relative { width: min(100%, 680px); max-height: min(900px, calc(100dvh - 40px)); border: 1px solid #e2e8f0; border-radius: 24px; box-shadow: 0 24px 80px #1b2e4b30 !important; }
+.planner-v2 .goal-editor-sheet > .relative > .overflow-y-auto { padding-bottom: max(18px, env(safe-area-inset-bottom)) !important; }
+.planner-v2 .goal-editor-sheet > .relative > div:first-child { padding-top: 12px; }
+.planner-v2 .goal-editor-sheet > .relative > div:nth-child(2) { padding: 17px 24px !important; border-color: #edf0f5; }
+.planner-v2 .goal-editor-sheet > .relative > div:nth-child(2) > span { color: #24344d; font-size: 18px; font-weight: 700; letter-spacing: -.025em; }
+.planner-v2 .goal-editor-content { display: grid; gap: 20px; padding: 22px 24px 24px !important; }
+.planner-v2 .goal-editor-section { display: grid; min-width: 0; gap: 13px; padding: 16px; border: 1px solid #e6ebf3; border-radius: 15px; background: #fff; }
+.planner-v2 .goal-editor-section-heading { display: flex; align-items: center; gap: 10px; }
+.planner-v2 .goal-editor-step { display: grid; width: 28px; height: 28px; place-items: center; flex: 0 0 auto; border-radius: 9px; color: #285f9f; background: #edf4ff; font-size: 12px; font-weight: 750; }
+.planner-v2 .goal-editor-section-heading h3 { margin: 0; color: #293c58; font-size: 14px; font-weight: 700; }
+.planner-v2 .goal-editor-section-heading p { margin: 3px 0 0; color: #65738a; font-size: 11px; }
+.planner-v2 .goal-editor-field { display: grid; min-width: 0; gap: 7px; }
+.planner-v2 .goal-editor-field > label { color: #354862 !important; font-size: 12px !important; font-weight: 650 !important; }
+.planner-v2 .goal-editor-field > label > span { color: #65738a; font-size: 11px; }
+.planner-v2 .goal-editor-input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 46px; padding: 11px 13px !important; border: 1px solid #cfd9e8; border-radius: 11px; outline: none; color: #263b59 !important; background: #f9fbfe !important; font-size: 14px !important; transition: border-color .16s, box-shadow .16s, background .16s; }
+.planner-v2 .goal-editor-input:focus { border-color: #4b8cdb; background: #fff !important; box-shadow: 0 0 0 3px #4188df21; }
+.planner-v2 .goal-editor-input::placeholder { color: #78869a !important; opacity: 1; }
+.planner-v2 .goal-editor-textarea { min-height: 78px; resize: vertical; line-height: 1.55; }
+.planner-v2 .goal-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.planner-v2 .goal-icon-picker { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+.planner-v2 .goal-icon-option { display: flex; min-width: 0; min-height: 64px; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 7px 3px; border: 1px solid #d9e1ed; border-radius: 11px; color: #50627d; background: #f9fbfe; font-size: 10px; font-weight: 600; }
+.planner-v2 .goal-icon-option span { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
+.planner-v2 .goal-icon-option:hover { border-color: #a5c4eb; background: #f0f6ff; }
+.planner-v2 .goal-icon-option.is-selected { border: 2px solid #3982d8; color: #245c9d; background: #edf5ff; }
+.planner-v2 .goal-priority-picker { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.planner-v2 .goal-priority-option { display: flex; align-items: flex-start; gap: 8px; min-width: 0; min-height: 70px; padding: 11px 9px; border: 1px solid #d8e0eb; border-radius: 11px; color: #344762; background: #fff; text-align: left; }
+.planner-v2 .goal-priority-option > span:nth-child(2) { display: grid; gap: 4px; min-width: 0; flex: 1; font-size: 12px; font-weight: 700; }
+.planner-v2 .goal-priority-option small { color: #65738a; font-size: 10px; font-weight: 450; line-height: 1.4; }
+.planner-v2 .goal-priority-option > svg { flex: 0 0 auto; color: #2b6eb5; }
+.planner-v2 .goal-priority-option.is-selected { border-color: #80addf; background: #f2f7ff; box-shadow: 0 0 0 1px #80addf55; }
+.planner-v2 .goal-priority-dot { width: 10px; height: 10px; flex: 0 0 auto; margin-top: 2px; border: 1px solid #25344b55; border-radius: 50%; }
+.planner-v2 .goals-repeat-options { display: grid; gap: 8px; }
+.planner-v2 .goal-repeat-option { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 58px; padding: 9px 12px; border: 1px solid #d8e0eb; border-radius: 11px; color: #344762; background: #fff; text-align: left; }
+.planner-v2 .goal-repeat-option:hover:not(:disabled) { border-color: #a5c4eb; background: #f8fbff; }
+.planner-v2 .goal-repeat-option.is-selected { border-color: #78a7db; background: #f0f6ff; box-shadow: 0 0 0 1px #78a7db45; }
+.planner-v2 .goal-repeat-option:disabled:not(.is-selected) { opacity: .48; }
+.planner-v2 .goal-repeat-radio { display: grid; width: 19px; height: 19px; place-items: center; flex: 0 0 auto; border: 1.5px solid #8494ab; border-radius: 50%; background: white; }
+.planner-v2 .goal-repeat-option.is-selected .goal-repeat-radio { border: 6px solid #397fda; }
+.planner-v2 .goal-repeat-option > span:last-child { display: grid; gap: 3px; }
+.planner-v2 .goal-repeat-option b { color: #293d58; font-size: 12px; }
+.planner-v2 .goal-repeat-option small { color: #65738a; font-size: 11px; }
+.planner-v2 .goal-repeat-note { margin: 0; padding: 10px 12px; border-radius: 9px; color: #52637d; background: #f2f5fa; font-size: 11px; line-height: 1.5; }
+.planner-v2 .goal-draft-subtasks { display: grid; gap: 7px; }
+.planner-v2 .goal-draft-subtasks > div { display: flex; align-items: center; gap: 9px; min-height: 43px; padding: 6px 7px 6px 10px; border: 1px solid #dce4f0; border-radius: 10px; color: #354762; background: #fff; }
+.planner-v2 .goal-draft-subtasks > div > span:nth-child(2) { min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: 12px; line-height: 1.45; }
+.planner-v2 .goal-draft-step-check { display: grid; place-items: center; flex: 0 0 22px; width: 22px; height: 22px; border-radius: 7px; color: #2f70b8; background: #eaf3ff; }
+.planner-v2 .goal-draft-subtasks button { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 9px; color: #6a7890; }
+.planner-v2 .goal-draft-subtasks button:hover { color: #aa4444; background: #fff0f0; }
+.planner-v2 .goal-add-subtask { display: flex; align-items: center; gap: 8px; }
+.planner-v2 .goal-add-subtask > .goal-editor-input { flex: 1; }
+.planner-v2 .goal-add-step-button { display: flex; min-height: 46px; flex: 0 0 auto; align-items: center; justify-content: center; gap: 4px; padding: 0 12px; border: 1px solid #b8d2ef; border-radius: 11px; color: #285f9f; background: #edf5ff; font-size: 11px; font-weight: 650; }
+.planner-v2 .goal-add-step-button:disabled { color: #65738a; background: #f0f2f6; border-color: #d9e0e9; }
+.planner-v2 .goal-editor-actions { position: sticky; bottom: -1px; z-index: 1; display: flex; gap: 9px; padding: 12px 0 max(2px, env(safe-area-inset-bottom)); border-top: 1px solid #e6ebf2; background: #fff; }
+.planner-v2 .goal-editor-actions > button { min-height: 48px; border-radius: 12px; font-size: 13px; }
+.planner-v2 .goal-editor-actions > button:last-child { color: #fff !important; background: #347cc8 !important; }
+.planner-v2 .goal-editor-actions > button:disabled { color: #64748b !important; background: #e9edf3 !important; }
+.planner-v2 .goal-editor-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.planner-v2 .planner-task-time { position: absolute; z-index: 2; top: 50%; left: -88px; display: flex; width: 66px; align-items: center; justify-content: flex-end; color: #344a69; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; transform: translateY(-50%); }
+.planner-v2 .planner-task-time svg { display: none; }
+.planner-v2 .goal-card-grid.has-scheduled-times { padding-left: 95px; }
+.planner-v2 .goal-card-grid.has-scheduled-times::before { left: 75px; }
+.planner-v2 .goal-card-grid.has-scheduled-times > *::before { left: -22px; }
+@media (max-width: 899px) {
+ .planner-v2 .goal-editor-sheet { align-items: stretch; }
+ .planner-v2 .goal-editor-sheet > .relative { width: 100%; max-height: min(94dvh, 940px); border: 0; border-radius: 22px 22px 0 0; }
+ .planner-v2 .goal-editor-content { gap: 14px; padding: 15px 15px max(18px, env(safe-area-inset-bottom)) !important; }
+ .planner-v2 .goal-editor-section { gap: 11px; padding: 13px; border-radius: 13px; }
+ .planner-v2 .goal-editor-grid { gap: 9px; }
+ .planner-v2 .goal-editor-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+ .planner-v2 .goal-icon-picker { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; }
+ .planner-v2 .goal-icon-option { min-height: 58px; }
+ .planner-v2 .goal-priority-picker { gap: 6px; }
+ .planner-v2 .goal-priority-option { min-height: 81px; flex-wrap: wrap; gap: 5px; padding: 9px 7px; }
+ .planner-v2 .goal-priority-option > span:nth-child(2) { flex-basis: calc(100% - 19px); }
+ .planner-v2 .goal-priority-option small { font-size: 9px; }
+ .planner-v2 .goal-add-step-button { width: 46px; padding: 0; font-size: 0; }
+ .planner-v2 .goal-editor-actions { margin: 0 -15px; padding: 11px 15px max(4px, env(safe-area-inset-bottom)); }
+ .planner-v2 .goal-editor-actions > button { min-height: 49px; }
+ .planner-v2 .goal-card-grid.has-scheduled-times { padding-left: 74px; }
+ .planner-v2 .goal-card-grid.has-scheduled-times::before { left: 53px; }
+ .planner-v2 .goal-card-grid.has-scheduled-times > *::before { left: -22px; }
+ .planner-v2 .planner-task-time { left: -70px; width: 44px; font-size: 11px; }
+}
+@media (max-width: 360px) {
+ .planner-v2 .goal-priority-picker { grid-template-columns: minmax(0,1fr); }
+ .planner-v2 .goal-priority-option { min-height: 54px; flex-wrap: nowrap; }
+ .planner-v2 .goal-priority-option > span:nth-child(2) { flex-basis: auto; }
+ .planner-v2 .goal-icon-option { font-size: 9px; }
+ .planner-v2 .goal-editor-section { padding: 11px; }
+}
+
 /* Task planner: paper canvas, calendar rhythm, distinct task rows. */
 .planner-v2 { box-sizing: border-box; width: 100%; max-width: 1400px; margin-inline: auto; padding: 28px 32px 32px !important; border: 1px solid #eceef5; border-radius: 26px; background: #fff; box-shadow: 0 8px 40px rgba(35,49,84,.035); --goal-ink: #232d43; --goal-muted: #7d8596; }
 .planner-v2 .goals-header { align-items: center; margin-bottom: 22px; padding-bottom: 20px; border-bottom: 1px solid #f0f1f6; }
@@ -472,4 +565,120 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
  @keyframes task-check-pop { 0% { transform: scale(.7); } 55% { transform: scale(1.22); } 100% { transform: scale(1); } }
  @keyframes task-finish-glow { 50% { background: #e3efff; border-color: #75a6e7; } }
  @keyframes task-spark { from { opacity: 1; transform: rotate(var(--burst-angle)) translateY(-15px) scale(.7); } to { opacity: 0; transform: rotate(var(--burst-angle)) translateY(-33px) scale(1); } }
+}
+
+/* Align the time label and timeline marker on the task card's vertical midpoint. */
+.planner-v2 .goal-card-grid.has-scheduled-times { padding-left: 95px; }
+.planner-v2 .goal-card-grid.has-scheduled-times::before { left: 75px; }
+.planner-v2 .goal-card-grid.has-scheduled-times > *::before { top: 50%; left: -23px; transform: translateY(-50%); }
+.planner-v2 .goal-card-grid.has-scheduled-times .planner-task-time { left: -93px; width: 66px; font-family: Manrope, Inter, sans-serif; font-size: 14px; font-weight: 800; letter-spacing: .015em; }
+@media (max-width: 899px) {
+ .planner-v2 .goal-card-grid.has-scheduled-times { padding-left: 74px; }
+ .planner-v2 .goal-card-grid.has-scheduled-times::before { left: 53px; }
+ .planner-v2 .goal-card-grid.has-scheduled-times > *::before { left: -24px; }
+ .planner-v2 .goal-card-grid.has-scheduled-times .planner-task-time { left: -72px; width: 44px; font-size: 12px; }
+}
+
+/* Make task steps read as a separate, tappable checklist. */
+.planner-v2 .goal-card-progress { margin: 0 14px 14px var(--goal-indent); padding: 13px 14px 12px; border: 1px solid #dce6f5; border-radius: 14px; background: #f8faff; }
+.planner-v2 .goal-progress-heading { margin: 0 0 9px; color: #344560; font-size: 12px; font-weight: 700; }
+.planner-v2 .goal-progress-heading b { min-width: 43px; padding: 4px 8px; border: 1px solid #dce7f7; border-radius: 999px; color: #315f9e; background: #fff; font-size: 11px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.planner-v2 .goal-progress-track { height: 6px; margin-bottom: 11px; border-radius: 999px; background: #e5ecf7; }
+.planner-v2 .goal-progress-track i { border-radius: inherit; background: linear-gradient(90deg, #77a9f2, #397fda); }
+.planner-v2 .goal-subtask-list { gap: 5px; margin-top: 0; }
+.planner-v2 .goal-subtask-row { min-height: 43px; gap: 10px; padding: 8px 10px; border: 1px solid #e2e9f3; border-radius: 10px; color: #34445e; background: #fff; font-size: 13px; font-weight: 550; line-height: 1.45; transition: border-color .16s ease, background .16s ease, box-shadow .16s ease, color .16s ease; }
+.planner-v2 .goal-subtask-row:hover { border-color: #b8cff0; background: #fff; box-shadow: 0 2px 8px #315f9e12; }
+.planner-v2 .goal-subtask-check { width: 21px; height: 21px; flex-basis: 21px; border: 1.5px solid #a9bad2; border-radius: 50%; color: transparent; transition: background .16s ease, border-color .16s ease, transform .16s ease; }
+.planner-v2 .goal-subtask-row:hover .goal-subtask-check { border-color: #5289d5; }
+.planner-v2 .goal-subtask-row.is-done { border-color: #dce9e2; color: #6c7d74; background: #f5faf6; }
+.planner-v2 .goal-subtask-row.is-done > span:last-child { text-decoration-color: #91ad9c; }
+.planner-v2 .goal-subtask-row.is-done .goal-subtask-check { border-color: #43885f; background: #43885f; color: #fff; }
+.planner-v2 .goal-subtask-row:active .goal-subtask-check { transform: scale(.9); }
+.planner-v2 .goal-subtask-hint { margin: 10px 1px 0; padding-top: 9px; border-top: 1px solid #e5ebf5; color: #64748b; font-size: 11px; }
+@media (max-width: 899px) {
+ .planner-v2 .goal-card-progress { margin: 0 12px 12px var(--goal-indent); padding: 11px; }
+ .planner-v2 .goal-subtask-row { min-height: 42px; font-size: 12px; }
+}
+
+/* Compact nested checklist: the tree rail communicates that these are task steps. */
+.planner-v2 .goal-card-progress { position: relative; margin: -3px 18px 13px var(--goal-indent); padding: 0; border: 0; border-radius: 0; background: transparent; }
+.planner-v2 .goal-progress-heading { justify-content: space-between; margin: 0 0 5px; padding-right: 43px; }
+.planner-v2 .goal-progress-heading > span { display: inline; color: #71829b; font-size: 10px; font-weight: 650; letter-spacing: .01em; }
+.planner-v2 .goal-progress-heading b { min-width: 0; padding: 2px 7px; border: 0; border-radius: 999px; color: #58759d; background: #e8effa; font-size: 10px; font-weight: 700; }
+.planner-v2 .goal-progress-track { position: absolute; top: 9px; right: 0; width: 34px; height: 4px; margin: 0; border-radius: 999px; background: #e4ebf5; }
+.planner-v2 .goal-progress-track i { background: #6795d5; }
+.planner-v2 .goal-subtask-list { position: relative; gap: 1px; margin: 0; padding-left: 16px; }
+.planner-v2 .goal-subtask-list::before { position: absolute; top: 4px; bottom: 17px; left: 6px; width: 1.5px; background: #c7d4e6; content: ''; }
+.planner-v2 .goal-subtask-row { position: relative; min-height: 32px; gap: 8px; padding: 4px 7px; border: 0; border-radius: 8px; color: #50617b; background: transparent; box-shadow: none; font-size: 12px; font-weight: 500; line-height: 1.4; }
+.planner-v2 .goal-subtask-row::before { position: absolute; top: 50%; left: -10px; width: 10px; height: 1.5px; background: #c7d4e6; content: ''; }
+.planner-v2 .goal-subtask-row:hover { border-color: transparent; background: #eaf1fc; box-shadow: none; }
+.planner-v2 .goal-subtask-check { width: 18px; height: 18px; flex-basis: 18px; border: 1.5px solid #a8b9d1; border-radius: 6px; background: #fff; }
+.planner-v2 .goal-subtask-row:hover .goal-subtask-check { border-color: #6593d0; }
+.planner-v2 .goal-subtask-row.is-done { color: #7a899d; background: transparent; }
+.planner-v2 .goal-subtask-row.is-done:hover { background: #f0f5f2; }
+.planner-v2 .goal-subtask-row.is-done .goal-subtask-check { border-color: #4b9569; border-radius: 6px; background: #4b9569; }
+.planner-v2 .goal-subtask-hint { display: none; }
+@media (max-width: 899px) {
+ .planner-v2 .goal-card-progress { margin: -2px 13px 11px var(--goal-indent); padding: 0; }
+ .planner-v2 .goal-subtask-row { min-height: 34px; font-size: 12px; }
+}
+
+/* Pill-first daily plan: each dose has an obvious, animated pill control. */
+.home-medications .dashboard-panel-content { padding-top: 13px; }
+.home-medications .medication-count-chip { min-height: 29px; border-color: #dce8f7; color: #426991; background: #f1f6fc; font-size: 10px; }
+.medication-pillboard { display: grid; gap: 13px; }
+.medication-pillboard-progress { display: grid; gap: 7px; padding: 0 2px 1px; }
+.medication-pillboard-progress-copy { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #687991; font-size: 11px; }
+.medication-pillboard-progress-copy span { color: #415b7d; font-weight: 700; }
+.medication-pillboard-progress-copy small { color: #8491a4; font-size: 10px; }
+.medication-pillboard-progress-track { height: 5px; overflow: hidden; border-radius: 99px; background: #eaf0f7; }
+.medication-pillboard-progress-track i { display: block; height: 100%; border-radius: inherit; background: #549af2; transition: width 350ms cubic-bezier(.2,.75,.25,1); }
+.medication-pillboard-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 11px; }
+.medication-pillboard-card { min-width: 0; padding: 13px; border: 1px solid #e5ebf3; border-radius: 17px; background: #fbfcfe; }
+.medication-pillboard-header { display: flex; min-width: 0; align-items: center; gap: 10px; margin-bottom: 11px; }
+.medication-pillboard-brand { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border: 1px solid #e0eaf7; border-radius: 14px; background: #f1f6fd; }
+.medication-pillboard-name { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.medication-pillboard-name b { overflow: hidden; color: #263953; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.medication-pillboard-name small { color: #78879c; font-size: 11px; }
+.medication-pillboard-frequency { flex: 0 0 auto; padding: 5px 8px; border-radius: 999px; color: #5e7594; background: #edf2f8; font-size: 10px; font-weight: 650; }
+.medication-dose-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.medication-dose-tile { display: flex; min-width: 0; min-height: 112px; flex-direction: column; align-items: center; justify-content: space-between; gap: 4px; padding: 8px 5px 9px; border: 1px solid #e6ebf3; border-radius: 14px; background: #fff; transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
+.medication-dose-tile:hover { transform: translateY(-2px); border-color: #c2d8f3; box-shadow: 0 7px 18px #315d9412; }
+.medication-dose-tile.is-taken { border-color: #c8dcf5; background: #f2f7ff; box-shadow: inset 0 0 0 1px #e1edfc; }
+.medication-dose-tile > time { color: #405b7d; font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.medication-pill-button { display: grid; width: 68px; height: 53px; place-items: center; border: 0; border-radius: 13px; outline: none; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.medication-pill-button:focus-visible { outline: 3px solid #549af2; outline-offset: 1px; }
+.medication-pill-figure { display: grid; width: 66px; height: 46px; place-items: center; color: #549af2; filter: drop-shadow(0 4px 4px #243d5c12); }
+.medication-pill-figure svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.medication-pill-figure.is-taken { filter: drop-shadow(0 5px 7px #3e82d840); }
+.medication-pill-figure.is-preview { width: 36px; height: 26px; filter: none; }
+.medication-pillboard-brand .medication-pill-figure.is-preview { width: 36px; height: 26px; }
+.medication-dose-tile-state { display: inline-flex; min-height: 17px; align-items: center; gap: 3px; color: #8793a4; font-size: 9px; font-weight: 600; text-align: center; }
+.medication-dose-tile.is-taken .medication-dose-tile-state { color: #367cbb; }
+.medication-next-dose-tile { display: flex; min-height: 66px; align-items: center; gap: 12px; padding: 9px 11px; border: 1px dashed #d9e4f2; border-radius: 13px; background: #f8fafd; }
+.medication-next-dose-figure { display: grid; width: 56px; height: 42px; flex: 0 0 56px; place-items: center; border-radius: 12px; background: #edf3fb; }
+.medication-next-dose-figure .medication-pill-figure { width: 48px; height: 32px; }
+.medication-next-dose-tile > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.medication-next-dose-tile small { color: #7e8ba0; font-size: 10px; }
+.medication-next-dose-tile b { color: #40536e; font-size: 12px; font-weight: 700; }
+.medication-shape-field { display: grid; gap: 7px; }
+.medication-shape-field > span { color: #68778d; font-size: 11px; font-weight: 600; }
+.medication-shape-picker { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 6px; }
+.medication-shape-option { display: flex; min-width: 0; min-height: 66px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 5px 3px; border: 1px solid #e0e7f0; border-radius: 12px; color: #66758a; background: #fff; font-size: 9px; font-weight: 600; transition: border-color 150ms ease, background 150ms ease, color 150ms ease; }
+.medication-shape-option:hover { border-color: #b9d0ee; }
+.medication-shape-option.is-selected { border-color: #78a9e6; color: #315f9d; background: #eef5ff; box-shadow: inset 0 0 0 1px #d9e9fc; }
+.medication-shape-option .medication-pill-figure { width: 46px; height: 30px; }
+.medication-amount-input { display: grid; grid-template-columns: minmax(0,1fr) 112px; gap: 6px; }
+.medication-amount-input input, .medication-amount-input select { min-width: 0; }
+.medication-settings-icon .medication-pill-figure { width: 32px; height: 24px; }
+@media (max-width: 559px) {
+ .home-medications .dashboard-panel-content { padding-top: 10px; }
+ .medication-pillboard { gap: 10px; }
+ .medication-pillboard-list { grid-template-columns: minmax(0,1fr); gap: 9px; }
+ .medication-pillboard-card { padding: 11px; border-radius: 15px; }
+ .medication-pillboard-header { margin-bottom: 9px; }
+ .medication-dose-tiles { grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 7px; }
+ .medication-dose-tile { min-height: 105px; }
+ .medication-pillboard-progress-copy small { font-size: 9px; }
+ .medication-amount-input { grid-template-columns: minmax(0,1fr) 96px; }
 }

@@ -8,7 +8,10 @@ type Goal = {
   createdAt?: string | null;
   recurring?: string;
   recurrenceSeriesId?: string;
-  recurrenceState?: Record<string, { completed?: boolean }>;
+  recurrenceEndDate?: string | null;
+  recurrenceSkippedDates?: string[];
+  recurrenceState?: Record<string, { completed?: boolean; missed?: boolean; missedStreak?: number }>;
+  subtasks?: { id: string; title?: string; done?: boolean }[];
   completed?: boolean;
   archived?: boolean;
 };
@@ -16,6 +19,7 @@ type Goal = {
 type Medication = {
   id?: string;
   name?: string;
+  doseUnit?: "tablets" | "drops";
   unitsPerDose?: number;
   frequency?: string;
   times?: string[];
@@ -45,7 +49,8 @@ type Snapshot = {
   workActivity?: Record<string, { totalSeconds?: number }>;
 };
 
-type Reminder = { key: string; text: string };
+type InlineButton = { text: string; callback_data: string };
+type Reminder = { key: string; text: string; keyboard?: InlineButton[][] };
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -87,6 +92,8 @@ function localDateTime(now: Date, timeZone: string) {
 function isGoalForDate(goal: Goal, date: string): boolean {
   if (goal.archived || goal.group !== "today") return false;
   if (!goal.recurring || goal.recurring === "none") return true;
+  if (goal.recurrenceEndDate && date > goal.recurrenceEndDate) return false;
+  if (goal.recurrenceSkippedDates?.includes(date)) return false;
   const created = goal.createdAt ?? goal.scheduledFor ?? date;
   if (date < created) return false;
   if (goal.recurrenceSeriesId) return goal.scheduledFor === date;
@@ -108,6 +115,25 @@ function plural(count: number, one: string, few: string, many: string): string {
   if (lastTwo >= 11 && lastTwo <= 14) return many;
   const last = count % 10;
   return last === 1 ? one : last >= 2 && last <= 4 ? few : many;
+}
+
+function formatDose(medication: Medication): string {
+  const count = Math.max(1, Math.floor(Number(medication.unitsPerDose) || 1));
+  return `${count} ${medication.doseUnit === "drops"
+    ? plural(count, "капля", "капли", "капель")
+    : plural(count, "таблетка", "таблетки", "таблеток")}`;
+}
+
+function taskKeyboard(goals: Goal[], date: string): InlineButton[][] | undefined {
+  const buttons = goals.slice(0, 5).flatMap(goal => {
+    if (!goal.id) return [];
+    const callbackData = `task|${date}|${goal.id}`;
+    if (new TextEncoder().encode(callbackData).length > 64) return [];
+    const title = String(goal.title ?? "Задача").trim() || "Задача";
+    const shortTitle = [...title].slice(0, 36).join("");
+    return [[{ text: `☑️ Отметить: ${shortTitle}`, callback_data: callbackData }]];
+  });
+  return buttons.length ? buttons : undefined;
 }
 
 function medicationTimesForDate(medication: Medication, date: string): string[] {
@@ -139,10 +165,13 @@ function dueReminders(snapshot: Snapshot, now: Date): Reminder[] {
       if (!medication.id || !medication.name) continue;
       for (const time of medicationTimesForDate(medication, local.date)) {
         if (time !== local.time || taken.includes(`${medication.id}:${time}`)) continue;
-        const dose = Math.max(1, Math.floor(Number(medication.unitsPerDose) || 1));
+        const callbackData = `med|${local.date}|${medication.id}|${time}`;
         reminders.push({
           key: `medication:${local.date}:${medication.id}:${time}`,
-          text: `Пора принять «${medication.name}» — ${dose} шт. (${time}).\nПосле приёма отметьте таблетку в приложении.`,
+          text: `⏰ Время приёма\n${medication.name}\nДоза: ${formatDose(medication)} · ${time}\n\nНажмите кнопку, когда примете препарат — я отмечу приём в приложении.`,
+          keyboard: new TextEncoder().encode(callbackData).length <= 64
+            ? [[{ text: `💊 Принял(а) · ${formatDose(medication)}`, callback_data: callbackData }]]
+            : undefined,
         });
       }
     }
@@ -157,7 +186,8 @@ function dueReminders(snapshot: Snapshot, now: Date): Reminder[] {
       : "На сегодня задач пока нет. Выберите одно или два важных дела, чтобы начать день с понятным планом.";
     reminders.push({
       key: `morning:${local.date}`,
-      text: `${greeting}\n${tasks}\nДолгосрочных целей в работе: ${activeGoals.length}.`,
+      text: `${greeting}\n\n${tasks}\n\nДолгосрочных целей в работе: ${activeGoals.length}. Хорошего и спокойного дня!`,
+      keyboard: taskKeyboard(unfinished, local.date),
     });
   }
 
@@ -167,7 +197,8 @@ function dueReminders(snapshot: Snapshot, now: Date): Reminder[] {
     && !(settings.startDayMessageEnabled && local.time === morningTime)) {
     reminders.push({
       key: `tasks:${local.date}:${local.time}`,
-      text: `На сегодня осталось ${unfinished.length} ${plural(unfinished.length, "задача", "задачи", "задач")}:\n${taskNames(unfinished)}\nНачните с одной — так будет легче двигаться дальше.`,
+      text: `Небольшое напоминание 🌿\nНа сегодня осталось ${unfinished.length} ${plural(unfinished.length, "задача", "задачи", "задач")}:\n${taskNames(unfinished)}\n\nВыберите одну и двигайтесь в своём темпе.`,
+      keyboard: taskKeyboard(unfinished, local.date),
     });
   }
 
@@ -188,15 +219,149 @@ function dueReminders(snapshot: Snapshot, now: Date): Reminder[] {
   return reminders;
 }
 
-Deno.serve(async request => {
-  if (!cronSecret || request.headers.get("x-cron-secret") !== cronSecret) {
-    return new Response("Unauthorized", { status: 401 });
+type TelegramUpdate = {
+  callback_query?: {
+    id: string;
+    data?: string;
+    from?: { id: number };
+    message?: {
+      message_id: number;
+      chat: { id: number; type?: string };
+      reply_markup?: { inline_keyboard?: InlineButton[][] };
+    };
+  };
+};
+
+async function telegram(method: string, payload: Record<string, unknown>) {
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.ok) {
+    throw new Error(`Telegram ${method} failed: ${response.status} ${JSON.stringify(result)}`);
   }
+  return result;
+}
+
+async function handleCallback(update: TelegramUpdate, supabase: ReturnType<typeof createClient>) {
+  const query = update.callback_query;
+  if (!query) return;
+  const message = query.message;
+  const chatId = message?.chat.id;
+  const callbackData = query.data ?? "";
+  if (callbackData === "noop") {
+    await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Уже отмечено ✅" });
+    return;
+  }
+  if (!message || !chatId || query.from?.id !== chatId || message.chat.type === "group" || message.chat.type === "supergroup") {
+    await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Эта кнопка доступна только в личном чате с ботом.", show_alert: true });
+    return;
+  }
+
+  try {
+    const [kind, date, itemId, time] = callbackData.split("|");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? "") || !itemId || (kind !== "task" && kind !== "med")) {
+      await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Не удалось распознать действие.", show_alert: true });
+      return;
+    }
+    const { data: user, error: userError } = await supabase.from("users").select("telegram_id,data").eq("telegram_id", chatId).maybeSingle();
+    if (userError) throw userError;
+    if (!user) {
+      await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Не нашёл ваш профиль. Откройте приложение через бота.", show_alert: true });
+      return;
+    }
+
+    const snapshot = structuredClone((user.data ?? {}) as Snapshot);
+    let answer = "Готово! Изменение сохранено в приложении ✅";
+    if (kind === "task") {
+      const goal = (snapshot.goals ?? []).find(item => item.id === itemId);
+      if (!goal || !isGoalForDate(goal, date)) {
+        await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Эта задача уже недоступна." });
+        return;
+      }
+      if (isGoalDone(goal, date)) {
+        await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Задача уже выполнена ✅" });
+      } else {
+        const timestamp = new Date().toISOString();
+        if (goal.subtasks?.length) goal.subtasks = goal.subtasks.map(subtask => ({ ...subtask, done: true }));
+        if (goal.recurring && goal.recurring !== "none") {
+          goal.recurrenceState = {
+            ...(goal.recurrenceState ?? {}),
+            [date]: { ...(goal.recurrenceState?.[date] ?? {}), completed: true, missed: false, missedStreak: 0 },
+          };
+        } else {
+          goal.completed = true;
+          goal.completedAt = timestamp;
+        }
+        const { error } = await supabase.from("users").update({ data: snapshot }).eq("telegram_id", chatId);
+        if (error) throw error;
+        await telegram("answerCallbackQuery", { callback_query_id: query.id, text: answer });
+      }
+    } else {
+      if (!time || !/^\d{2}:\d{2}$/.test(time)) {
+        await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Не удалось распознать время приёма.", show_alert: true });
+        return;
+      }
+      const medication = (snapshot.medications ?? []).find(item => item.id === itemId);
+      if (!medication || !medicationTimesForDate(medication, date).includes(time)) {
+        await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Этот приём уже не запланирован." });
+        return;
+      }
+      const log = snapshot.medicationLog ?? {};
+      const doses = log[date] ?? [];
+      const doseKey = `${itemId}:${time}`;
+      if (doses.includes(doseKey)) {
+        answer = "Приём уже отмечен ✅";
+      } else {
+        snapshot.medicationLog = { ...log, [date]: [...doses, doseKey] };
+        const { error } = await supabase.from("users").update({ data: snapshot }).eq("telegram_id", chatId);
+        if (error) throw error;
+      }
+      await telegram("answerCallbackQuery", { callback_query_id: query.id, text: answer });
+    }
+
+    const updatedKeyboard = (message.reply_markup?.inline_keyboard ?? []).map(row => row.map(button =>
+      button.callback_data === callbackData
+        ? { text: kind === "med" ? "✅ Приём отмечен" : "✅ Выполнено", callback_data: "noop" }
+        : button,
+    ));
+    if (updatedKeyboard.some(row => row.some(button => button.callback_data === "noop"))) {
+      await telegram("editMessageReplyMarkup", {
+        chat_id: chatId,
+        message_id: message.message_id,
+        reply_markup: { inline_keyboard: updatedKeyboard },
+      });
+    }
+  } catch (error) {
+    console.error("Could not process Telegram callback", error);
+    await telegram("answerCallbackQuery", {
+      callback_query_id: query.id,
+      text: "Не удалось сохранить. Попробуйте ещё раз или отметьте в приложении.",
+      show_alert: true,
+    }).catch(() => undefined);
+  }
+}
+
+Deno.serve(async request => {
   if (!supabaseUrl || !serviceRoleKey || !botToken) {
     return new Response("Server configuration is incomplete", { status: 500 });
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+  if (request.method === "POST" && cronSecret && request.headers.get("x-telegram-bot-api-secret-token") === cronSecret) {
+    try {
+      await handleCallback(await request.json() as TelegramUpdate, supabase);
+      return Response.json({ ok: true });
+    } catch (error) {
+      console.error("Could not handle Telegram update", error);
+      return Response.json({ ok: false }, { status: 500 });
+    }
+  }
+  if (!cronSecret || request.headers.get("x-cron-secret") !== cronSecret) {
+    return new Response("Unauthorized", { status: 401 });
+  }
   const now = new Date();
   let checked = 0;
   let delivered = 0;
@@ -224,12 +389,12 @@ Deno.serve(async request => {
         }
 
         try {
-          const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chat_id: telegramId, text: reminder.text, disable_web_page_preview: true }),
+          await telegram("sendMessage", {
+            chat_id: telegramId,
+            text: reminder.text,
+            disable_web_page_preview: true,
+            ...(reminder.keyboard ? { reply_markup: { inline_keyboard: reminder.keyboard } } : {}),
           });
-          if (!response.ok) throw new Error(`Telegram API returned ${response.status}`);
           delivered++;
         } catch (error) {
           failed++;

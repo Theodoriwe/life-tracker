@@ -2019,8 +2019,6 @@ body::-webkit-scrollbar,
 .goals-editor-content > div > .flex.gap-2 > button:has(span.inline-flex) { border-width: 1px; background: #fff; }
 .goals-editor-content > div > .flex.gap-2 > input { min-width: 0; }
 .goals-editor-content > div > .flex.gap-2 > button:has(svg) { flex: 0 0 44px; min-width: 44px; color: #477fb9; background: #eaf3ff; }
-.goals-repeat-options > button { border: 1px solid #e5eaf0 !important; color: #738197 !important; background: #f6f8fb !important; }
-.goals-repeat-options > button[style] { border-color: #cfe3fb !important; color: #2f75c1 !important; background: #eaf3ff !important; }
 .goals-editor-content button:active { transform: scale(.98); }
 .goals-editor-content .space-y-2 > div { min-height: 30px; }
 .goals-editor-content .space-y-2 > div > button { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 8px; color: #9aa6b5; }
