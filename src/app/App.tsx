@@ -1296,8 +1296,11 @@ function HomeTab({
     .reduce((acc, f) => acc + Math.round(f.calories * f.portion / 100), 0);
 
   const goalsToday = data.goals.filter(g =>
-    !g.archived && g.group === "today" &&
-    (g.recurring === "none" || isGoalRecurringVisibleForDate(g, todayKey))
+    !g.archived && g.group === "today" && (
+      g.recurring === "daily" || g.recurring === "weekly"
+        ? isGoalRecurringVisibleForDate(g, todayKey)
+        : getGoalDateValue(g, todayKey) === todayKey
+    )
   );
   const completedGoalsToday = goalsToday.filter(g => isGoalCompletedForDate(g, todayKey)).length;
   const weekActivity = getDateWindow(todayKey, 7).map(date => {
