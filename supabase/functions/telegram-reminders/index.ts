@@ -5,6 +5,8 @@ type Goal = {
   title?: string;
   group?: string;
   scheduledFor?: string | null;
+  deadline?: string | null;
+  time?: string | null;
   createdAt?: string | null;
   recurring?: string;
   recurrenceSeriesId?: string;
@@ -91,7 +93,9 @@ function localDateTime(now: Date, timeZone: string) {
 
 function isGoalForDate(goal: Goal, date: string): boolean {
   if (goal.archived || goal.group !== "today") return false;
-  if (!goal.recurring || goal.recurring === "none") return true;
+  if (!goal.recurring || goal.recurring === "none") {
+    return (goal.scheduledFor ?? goal.deadline ?? goal.createdAt ?? date) === date;
+  }
   if (goal.recurrenceEndDate && date > goal.recurrenceEndDate) return false;
   if (goal.recurrenceSkippedDates?.includes(date)) return false;
   const created = goal.createdAt ?? goal.scheduledFor ?? date;
@@ -156,6 +160,8 @@ function dueReminders(snapshot: Snapshot, now: Date): Reminder[] {
   const local = localDateTime(now, settings.notificationTimeZone || "UTC");
   const goals = (Array.isArray(snapshot.goals) ? snapshot.goals : []).filter(goal => isGoalForDate(goal, local.date));
   const unfinished = goals.filter(goal => !isGoalDone(goal, local.date));
+  const untimedGoals = goals.filter(goal => !goal.time);
+  const unfinishedUntimed = untimedGoals.filter(goal => !isGoalDone(goal, local.date));
   const activeGoals = (Array.isArray(snapshot.goals) ? snapshot.goals : []).filter(goal => !goal.archived && !goal.completed && goal.group === "longterm");
   const reminders: Reminder[] = [];
 
@@ -191,14 +197,33 @@ function dueReminders(snapshot: Snapshot, now: Date): Reminder[] {
     });
   }
 
+  const tasksDueNow = settings.taskRemindersEnabled
+    ? unfinished.filter(goal => goal.time === local.time)
+    : [];
+  if (tasksDueNow.length) {
+    const count = tasksDueNow.length;
+    reminders.push({
+      key: `tasks-due:${local.date}:${local.time}:${tasksDueNow.map(goal => goal.id).filter(Boolean).sort().join(",")}`,
+      text: `⏰ Время по плану\n${count === 1 ? "Сейчас запланирована задача:" : `Сейчас запланировано ${count} ${plural(count, "задача", "задачи", "задач")}:`}\n${taskNames(tasksDueNow)}\n\nВыдели немного времени и начни с первого шага. Если планы поменялись — перенеси задачу в приложении.`,
+      keyboard: taskKeyboard(tasksDueNow, local.date),
+    });
+  }
+
   const interval = Math.min(12, Math.max(1, Math.floor(Number(settings.taskReminderIntervalHours) || 1)));
-  if (settings.taskRemindersEnabled && unfinished.length > 0 && local.minute === 0
+  if (settings.taskRemindersEnabled && unfinishedUntimed.length > 0 && local.minute === 0
     && local.hour % interval === 0 && local.time >= morningTime && local.time < eveningTime
     && !(settings.startDayMessageEnabled && local.time === morningTime)) {
+    const completedUntimed = untimedGoals.length - unfinishedUntimed.length;
+    const progress = untimedGoals.length
+      ? `Из задач без времени выполнено ${completedUntimed} из ${untimedGoals.length}.`
+      : "";
+    const encouragement = completedUntimed === 0
+      ? "Пока ни одна не сделана — это не повод себя ругать. Выбери самую простую и удели ей 5 минут."
+      : `Уже выполнено ${completedUntimed} ${plural(completedUntimed, "задача", "задачи", "задач")} — отличное начало. Выбери следующую и продолжай в своём темпе.`;
     reminders.push({
       key: `tasks:${local.date}:${local.time}`,
-      text: `Небольшое напоминание 🌿\nНа сегодня осталось ${unfinished.length} ${plural(unfinished.length, "задача", "задачи", "задач")}:\n${taskNames(unfinished)}\n\nВыберите одну и двигайтесь в своём темпе.`,
-      keyboard: taskKeyboard(unfinished, local.date),
+      text: `Небольшой чек-ин 🌿\n${progress}\nОсталось ${unfinishedUntimed.length} ${plural(unfinishedUntimed.length, "задача", "задачи", "задач")} без времени:\n${taskNames(unfinishedUntimed)}\n\n${encouragement}`,
+      keyboard: taskKeyboard(unfinishedUntimed, local.date),
     });
   }
 
