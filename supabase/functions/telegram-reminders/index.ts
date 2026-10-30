@@ -97,6 +97,29 @@ function localDateTime(now: Date, timeZone: string) {
   };
 }
 
+function localDayStartUtc(now: Date, timeZone: string): string {
+  const localDate = localDateTime(now, timeZone).date;
+  const guess = new Date(`${localDate}T00:00:00.000Z`);
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(guess);
+  } catch {
+    return `${localDate}T00:00:00.000Z`;
+  }
+  const value = (type: string) => Number(parts.find(part => part.type === type)?.value ?? 0);
+  const asUtc = Date.UTC(value("year"), value("month") - 1, value("day"), value("hour"), value("minute"), value("second"));
+  return new Date(guess.getTime() - (asUtc - guess.getTime())).toISOString();
+}
+
 function isGoalForDate(goal: Goal, date: string): boolean {
   if (goal.archived || goal.group !== "today") return false;
   if (!goal.recurring || goal.recurring === "none") {
@@ -276,45 +299,135 @@ async function telegram(method: string, payload: Record<string, unknown>) {
   return result;
 }
 
+async function deleteNotificationMessage(chatId: number, messageId: number) {
+  try {
+    await telegram("deleteMessage", { chat_id: chatId, message_id: messageId });
+  } catch (error) {
+    console.warn("Could not delete Telegram notification message", error);
+    await telegram("editMessageReplyMarkup", {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: { inline_keyboard: [] },
+    }).catch(() => undefined);
+  }
+}
+
+async function replaceCallbackMessageWithNotice(chatId: number, messageId: number, text: string) {
+  try {
+    await telegram("editMessageText", {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      reply_markup: { inline_keyboard: [] },
+    });
+  } catch (error) {
+    console.warn("Could not update Telegram callback message", error);
+    await deleteNotificationMessage(chatId, messageId);
+  }
+}
+
+async function cleanupPreviousDayMessages(
+  supabase: ReturnType<typeof createClient>,
+  telegramId: number,
+  now: Date,
+  timeZone: string,
+) {
+  const local = localDateTime(now, timeZone);
+  if (local.hour !== 0 || local.minute > 10) return;
+  const { data: messages, error } = await supabase.from("telegram_notification_deliveries")
+    .select("notification_key,telegram_message_id")
+    .eq("telegram_id", telegramId)
+    .lt("sent_at", localDayStartUtc(now, timeZone))
+    .not("telegram_message_id", "is", null)
+    .limit(100);
+  if (error) {
+    console.error("Could not load old Telegram messages for cleanup", error.message);
+    return;
+  }
+  for (const message of messages ?? []) {
+    const messageId = Number(message.telegram_message_id);
+    try {
+      await telegram("deleteMessage", { chat_id: telegramId, message_id: messageId });
+      const { error: updateError } = await supabase.from("telegram_notification_deliveries")
+        .update({ telegram_message_id: null })
+        .eq("telegram_id", telegramId)
+        .eq("notification_key", message.notification_key);
+      if (updateError) console.error("Could not mark Telegram message as deleted", updateError.message);
+    } catch (deleteError) {
+      console.error("Could not delete previous-day Telegram message", deleteError);
+    }
+  }
+}
+
+async function telegramWebhookSecret(): Promise<string | undefined> {
+  if (!cronSecret) return undefined;
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`life-tracker-telegram-webhook:${cronSecret}`),
+  );
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function ensureTelegramWebhook() {
+  if (!supabaseUrl || !cronSecret) return;
+  const webhookUrl = `${supabaseUrl}/functions/v1/telegram-reminders`;
+  try {
+    const info = await telegram("getWebhookInfo", {});
+    const currentUrl = String(info.result?.url ?? "");
+    if (currentUrl && currentUrl !== webhookUrl) {
+      console.error("Telegram bot already has a different webhook URL; keeping its existing destination.");
+      return;
+    }
+    await telegram("setWebhook", {
+      url: webhookUrl,
+      secret_token: await telegramWebhookSecret(),
+      allowed_updates: ["callback_query"],
+    });
+  } catch (error) {
+    console.error("Could not configure Telegram callback webhook", error);
+  }
+}
+
 async function handleCallback(update: TelegramUpdate, supabase: ReturnType<typeof createClient>) {
   const query = update.callback_query;
   if (!query) return;
   const message = query.message;
   const chatId = message?.chat.id;
   const callbackData = query.data ?? "";
+  // Telegram shows a spinner until this is acknowledged. Do it before any database work.
+  await telegram("answerCallbackQuery", {
+    callback_query_id: query.id,
+    text: callbackData === "noop" ? "Уже отмечено ✅" : "Отмечаю…",
+  }).catch(error => console.warn("Could not acknowledge Telegram callback immediately", error));
   if (callbackData === "noop") {
-    await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Уже отмечено ✅" });
+    if (message && chatId) await deleteNotificationMessage(chatId, message.message_id);
     return;
   }
   if (!message || !chatId || query.from?.id !== chatId || message.chat.type === "group" || message.chat.type === "supergroup") {
-    await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Эта кнопка доступна только в личном чате с ботом.", show_alert: true });
     return;
   }
 
   try {
     const [kind, date, itemId, time] = callbackData.split("|");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? "") || !itemId || (kind !== "task" && kind !== "med")) {
-      await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Не удалось распознать действие.", show_alert: true });
+      await replaceCallbackMessageWithNotice(chatId, message.message_id, "Не удалось распознать действие. Откройте приложение и отметьте его там.");
       return;
     }
     const { data: user, error: userError } = await supabase.from("users").select("telegram_id,data").eq("telegram_id", chatId).maybeSingle();
     if (userError) throw userError;
     if (!user) {
-      await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Не нашёл ваш профиль. Откройте приложение через бота.", show_alert: true });
+      await replaceCallbackMessageWithNotice(chatId, message.message_id, "Не нашёл ваш профиль. Откройте приложение через бота.");
       return;
     }
 
     const snapshot = structuredClone((user.data ?? {}) as Snapshot);
-    let answer = "Готово! Изменение сохранено в приложении ✅";
     if (kind === "task") {
       const goal = (snapshot.goals ?? []).find(item => item.id === itemId);
       if (!goal || !isGoalForDate(goal, date)) {
-        await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Эта задача уже недоступна." });
+        await replaceCallbackMessageWithNotice(chatId, message.message_id, "Эта задача уже недоступна. Проверьте её в приложении.");
         return;
       }
-      if (isGoalDone(goal, date)) {
-        await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Задача уже выполнена ✅" });
-      } else {
+      if (!isGoalDone(goal, date)) {
         const timestamp = new Date().toISOString();
         if (goal.subtasks?.length) goal.subtasks = goal.subtasks.map(subtask => ({ ...subtask, done: true }));
         if (goal.recurring && goal.recurring !== "none") {
@@ -356,50 +469,31 @@ async function handleCallback(update: TelegramUpdate, supabase: ReturnType<typeo
         }
         const { error } = await supabase.from("users").update({ data: snapshot }).eq("telegram_id", chatId);
         if (error) throw error;
-        await telegram("answerCallbackQuery", { callback_query_id: query.id, text: answer });
       }
     } else {
       if (!time || !/^\d{2}:\d{2}$/.test(time)) {
-        await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Не удалось распознать время приёма.", show_alert: true });
+        await replaceCallbackMessageWithNotice(chatId, message.message_id, "Не удалось распознать время приёма. Отметьте его в приложении.");
         return;
       }
       const medication = (snapshot.medications ?? []).find(item => item.id === itemId);
       if (!medication || !medicationTimesForDate(medication, date).includes(time)) {
-        await telegram("answerCallbackQuery", { callback_query_id: query.id, text: "Этот приём уже не запланирован." });
+        await replaceCallbackMessageWithNotice(chatId, message.message_id, "Этот приём уже не запланирован. Проверьте расписание в приложении.");
         return;
       }
       const log = snapshot.medicationLog ?? {};
       const doses = log[date] ?? [];
       const doseKey = `${itemId}:${time}`;
-      if (doses.includes(doseKey)) {
-        answer = "Приём уже отмечен ✅";
-      } else {
+      if (!doses.includes(doseKey)) {
         snapshot.medicationLog = { ...log, [date]: [...doses, doseKey] };
         const { error } = await supabase.from("users").update({ data: snapshot }).eq("telegram_id", chatId);
         if (error) throw error;
       }
-      await telegram("answerCallbackQuery", { callback_query_id: query.id, text: answer });
     }
 
-    const updatedKeyboard = (message.reply_markup?.inline_keyboard ?? []).map(row => row.map(button =>
-      button.callback_data === callbackData
-        ? { text: kind === "med" ? "✅ Приём отмечен" : "✅ Выполнено", callback_data: "noop" }
-        : button,
-    ));
-    if (updatedKeyboard.some(row => row.some(button => button.callback_data === "noop"))) {
-      await telegram("editMessageReplyMarkup", {
-        chat_id: chatId,
-        message_id: message.message_id,
-        reply_markup: { inline_keyboard: updatedKeyboard },
-      });
-    }
+    await deleteNotificationMessage(chatId, message.message_id);
   } catch (error) {
     console.error("Could not process Telegram callback", error);
-    await telegram("answerCallbackQuery", {
-      callback_query_id: query.id,
-      text: "Не удалось сохранить. Попробуйте ещё раз или отметьте в приложении.",
-      show_alert: true,
-    }).catch(() => undefined);
+    if (chatId && message) await replaceCallbackMessageWithNotice(chatId, message.message_id, "Не удалось сохранить отметку. Попробуйте ещё раз или отметьте её в приложении.");
   }
 }
 
@@ -409,7 +503,9 @@ Deno.serve(async request => {
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
-  if (request.method === "POST" && cronSecret && request.headers.get("x-telegram-bot-api-secret-token") === cronSecret) {
+  const callbackSecret = request.headers.get("x-telegram-bot-api-secret-token");
+  const expectedWebhookSecret = await telegramWebhookSecret();
+  if (request.method === "POST" && cronSecret && (callbackSecret === cronSecret || callbackSecret === expectedWebhookSecret)) {
     try {
       await handleCallback(await request.json() as TelegramUpdate, supabase);
       return Response.json({ ok: true });
@@ -421,6 +517,7 @@ Deno.serve(async request => {
   if (!cronSecret || request.headers.get("x-cron-secret") !== cronSecret) {
     return new Response("Unauthorized", { status: 401 });
   }
+  await ensureTelegramWebhook();
   const now = new Date();
   let checked = 0;
   let delivered = 0;
@@ -437,7 +534,9 @@ Deno.serve(async request => {
       checked++;
       const telegramId = Number(user.telegram_id);
       if (!Number.isSafeInteger(telegramId) || telegramId <= 0) continue;
-      for (const reminder of dueReminders((user.data ?? {}) as Snapshot, now)) {
+      const snapshot = (user.data ?? {}) as Snapshot;
+      await cleanupPreviousDayMessages(supabase, telegramId, now, snapshot.settings?.notificationTimeZone || "UTC");
+      for (const reminder of dueReminders(snapshot, now)) {
         const { error: claimError } = await supabase.from("telegram_notification_deliveries")
           .insert({ telegram_id: telegramId, notification_key: reminder.key });
         if (claimError?.code === "23505") continue;
@@ -448,12 +547,20 @@ Deno.serve(async request => {
         }
 
         try {
-          await telegram("sendMessage", {
+          const sent = await telegram("sendMessage", {
             chat_id: telegramId,
             text: reminder.text,
             disable_web_page_preview: true,
             ...(reminder.keyboard ? { reply_markup: { inline_keyboard: reminder.keyboard } } : {}),
           });
+          const messageId = Number(sent.result?.message_id);
+          if (Number.isSafeInteger(messageId) && messageId > 0) {
+            const { error: saveMessageError } = await supabase.from("telegram_notification_deliveries")
+              .update({ telegram_message_id: messageId })
+              .eq("telegram_id", telegramId)
+              .eq("notification_key", reminder.key);
+            if (saveMessageError) console.error("Could not save Telegram message ID for cleanup", saveMessageError.message);
+          }
           delivered++;
         } catch (error) {
           failed++;

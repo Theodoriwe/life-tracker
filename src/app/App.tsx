@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { AreaChart, Area, Bar, BarChart, CartesianGrid, Cell, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { ArrowRight, ArrowUpRight, BarChart3, Bike, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Dumbbell, Flame, Heart, House, MoreHorizontal, Pencil, Pill as PillIcon, Plus, ShoppingBag, Sparkles, Target, Trash2, TrendingUp, Undo2, Utensils, X, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, BarChart3, Bike, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Dumbbell, Flame, FolderKanban, Heart, House, MoreHorizontal, Pencil, Pill as PillIcon, Plus, ShoppingBag, Sparkles, Target, Trash2, TrendingUp, Undo2, Utensils, X, type LucideIcon } from "lucide-react";
 import { Slider } from "./components/ui/slider";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "./components/ui/chart";
 import { supabase } from "../lib/supabase";
 import { HourlyActivityChart } from "./components/figma/HourlyActivityChart";
+import { GutDiary } from "./components/nutrition/GutDiary";
+import { EMPTY_GUT_DIARY, type GutDiaryData } from "./components/nutrition/gutDiaryModel";
 
 // ═══════════════════════════════════════════════════
 // GLOBAL DEBUG LOGGER
@@ -18,7 +20,7 @@ function addLog(msg: string) {
 // TYPES
 // ═══════════════════════════════════════════════════
 
-type AppTab = "home" | "work" | "goals" | "nutrition" | "habits";
+type AppTab = "home" | "work" | "goals" | "projects" | "nutrition" | "habits";
 type Priority = "high" | "medium" | "low";
 type GoalGroup = "all" | "today" | "week" | "longterm";
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -113,6 +115,26 @@ interface Goal {
   continuationFromId?: string;
   continuationFromTitle?: string;
   continuationGoalId?: string;
+  projectId?: string | null;
+  projectSectionId?: string | null;
+  isLargeTask?: boolean;
+  progressPercent?: number;
+  progressUpdatedAt?: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+  updatedAt?: string;
+  sections?: ProjectSection[];
+}
+
+interface ProjectSection {
+  id: string;
+  name: string;
+  createdAt: string;
 }
 
 interface FoodItem {
@@ -168,9 +190,11 @@ interface DailyDiary {
 }
 
 interface AppData {
+  gutDiary?: GutDiaryData;
   settings: Settings;
  workActivity: Record<string, { totalSeconds: number; hours: Record<string, number> }>;
   goals: Goal[];
+  projects: Project[];
   foodDiary: Record<string, DailyDiary>;
   myMenu: MyMenuItem[];
   water: Record<string, number>;
@@ -719,6 +743,7 @@ function shortDay(dateStr: string): string {
 }
 
 function calcGoalProgress(g: Goal): number {
+  if (g.isLargeTask) return Math.max(0, Math.min(100, g.progressPercent ?? 0));
   if (g.subtasks.length === 0) return g.completed ? 100 : 0;
   return Math.round((g.subtasks.filter(s => s.done).length / g.subtasks.length) * 100);
 }
@@ -922,7 +947,9 @@ function loadData(): AppData {
         settings: { ...DEFAULT_SETTINGS, ...saved.settings },
         workActivity: saved.workActivity ?? {},
         goals: saved.goals ?? [],
+        projects: saved.projects ?? [],
         foodDiary: saved.foodDiary ?? {},
+        gutDiary: saved.gutDiary ?? EMPTY_GUT_DIARY,
         myMenu: saved.myMenu ?? [],
         water: saved.water ?? {},
         journalEntries: saved.journalEntries ?? [],
@@ -938,7 +965,9 @@ function loadData(): AppData {
     settings: { ...DEFAULT_SETTINGS },
     workActivity: {},
     goals: [],
+    projects: [],
     foodDiary: {},
+    gutDiary: EMPTY_GUT_DIARY,
     myMenu: [],
     water: {},
     journalEntries: [],
@@ -1380,6 +1409,7 @@ function HomeTab({
           ...g,
           completed: true,
           completedAt: new Date().toISOString(),
+          ...(g.isLargeTask ? { progressPercent: 100, progressUpdatedAt: new Date().toISOString() } : {}),
           subtasks: g.subtasks.map(step => ({ ...step, done: true })),
         };
         return {
@@ -1594,20 +1624,23 @@ function HomeTab({
           <div className="dashboard-goal-list">
             {goalsToday.slice(0, 5).map(goal => {
               const completed = isGoalCompletedForDate(goal, todayKey);
+              const project = data.projects.find(item => item.id === goal.projectId);
+              const taskSection = project?.sections?.find(section => section.id === goal.projectSectionId);
               return (
                 <div key={goal.id} className={`dashboard-goal-row ${completed ? "is-complete" : ""}`}>
                   <button className="dashboard-goal-check" onClick={() => !completed && handleCompleteGoal(goal.id)} aria-label={completed ? "Задача выполнена" : `Отметить выполненной: ${goal.title}`} disabled={completed}>{completed && <Check size={13} />}</button>
                   <div className="dashboard-goal-copy">
-                    <p>{goal.title}</p>
+                    <p>{project && <span style={{ color: project.color, fontWeight: 700 }}>{project.name}{taskSection ? ` / ${taskSection.name}` : ""} · </span>}{goal.title}</p>
                     <div className="dashboard-goal-meta">
                       <span className="dashboard-priority-tag"><i style={{ background: PRIORITY_COLORS[goal.priority] }} />{PRIORITY_LABELS[goal.priority]} приоритет</span>
                       {goal.subtasks.length > 0 && <span>{goal.subtasks.filter(task => task.done).length} из {goal.subtasks.length} подзадач</span>}
+                      {goal.isLargeTask && <span>Большая задача · {calcGoalProgress(goal)}%</span>}
                       {goal.continuationFromTitle && <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF3FF] px-2 py-0.5 text-[10px] font-semibold text-[#285EA4]"><ArrowRight size={11} />Продолжение</span>}
                       {goal.nextStepTitle && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#526174]"><ArrowRight size={11} />Дальше: {goal.nextStepTitle}</span>}
                     </div>
-                    {goal.subtasks.length > 0 && <div className="dashboard-goal-progress-track"><i style={{ width: `${calcGoalProgress(goal)}%` }} /></div>}
+                    {(goal.subtasks.length > 0 || goal.isLargeTask) && <div className="dashboard-goal-progress-track"><i style={{ width: `${calcGoalProgress(goal)}%`, background: project?.color }} /></div>}
                   </div>
-                  {goal.subtasks.length > 0 && <span className="dashboard-goal-progress">{calcGoalProgress(goal)}%</span>}
+                  {(goal.subtasks.length > 0 || goal.isLargeTask) && <span className="dashboard-goal-progress">{calcGoalProgress(goal)}%</span>}
                 </div>
               );
             })}
@@ -2102,7 +2135,7 @@ function WorkTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData) 
 // GOALS TAB
 // ═══════════════════════════════════════════════════
 
-function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData) => AppData) => void }) {
+function GoalsTab({ data, setData, projectFilter, projectSectionFilter, taskContext, onClearProjectFilter, onTaskContextConsumed }: { data: AppData; setData: (fn: (p: AppData) => AppData) => void; projectFilter: string | null; projectSectionFilter: string | null; taskContext: { projectId: string; sectionId: string | null } | null; onClearProjectFilter: () => void; onTaskContextConsumed: () => void }) {
   const [group, setGroup] = useState<GoalGroup>("all");
   const [selectedDate, setSelectedDate] = useState(getDateKey());
   const [showArchive, setShowArchive] = useState(false);
@@ -2184,7 +2217,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   }, [todayKey, setData]);
 
   const newGoal = (): Partial<Goal> => ({
-    title: "", icon: "target", description: "", deadline: null, time: null, priority: "medium", group: group === "all" ? "today" : group, scheduledFor: selectedDate, subtasks: [], recurring: "none", nextStepTitle: "",
+    title: "", icon: "target", description: "", deadline: null, time: null, priority: "medium", group: group === "all" ? "today" : group, scheduledFor: selectedDate, subtasks: [], recurring: "none", nextStepTitle: "", projectId: taskContext?.projectId ?? projectFilter, projectSectionId: taskContext?.sectionId ?? projectSectionFilter, isLargeTask: false, progressPercent: 0,
   });
   const [draft, setDraft] = useState<Partial<Goal>>(newGoal());
   const [newSubtask, setNewSubtask] = useState("");
@@ -2255,7 +2288,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
     return selectedDate > end;
   };
 
-  const visibleGoals = data.goals.filter(g => !g.archived && matchesSelectedDate(g));
+  const visibleGoals = data.goals.filter(g => !g.archived && (!projectFilter || g.projectId === projectFilter) && (!projectSectionFilter || g.projectSectionId === projectSectionFilter) && (projectFilter ? true : matchesSelectedDate(g)));
   const activeGoals = group === "all" ? visibleGoals : visibleGoals.filter(g => g.group === group);
   const archivedGoals = data.goals.filter(g => g.archived && !isExpiredArchivedGoal(g));
   const sortGoalsForDisplay = (goals: Goal[]) => [...goals].sort((a, b) => {
@@ -2317,6 +2350,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
           ...g,
           completed: true,
           completedAt: new Date().toISOString(),
+          ...(g.isLargeTask ? { progressPercent: 100, progressUpdatedAt: new Date().toISOString() } : {}),
           subtasks: g.subtasks.map(s => ({ ...s, done: true })),
           recurrenceState: {
             ...(g.recurrenceState ?? {}),
@@ -2348,6 +2382,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
           ...g,
           completed: false,
           completedAt: null,
+          ...(g.isLargeTask && (g.progressPercent ?? 0) >= 100 ? { progressPercent: 95 } : {}),
           subtasks: g.subtasks.map(s => ({ ...s, done: false })),
           recurrenceState: {
             ...(g.recurrenceState ?? {}),
@@ -2437,6 +2472,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
         return {
           ...g,
           subtasks: updatedSubtasks,
+          progressUpdatedAt: new Date().toISOString(),
           completed: allDone ? true : updatedSubtasks.length > 0 ? false : g.completed,
           completedAt: allDone ? new Date().toISOString() : updatedSubtasks.length > 0 ? null : g.completedAt,
           recurrenceState: {
@@ -2479,6 +2515,14 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
     setShowAddSheet(true);
   };
 
+  useEffect(() => {
+    if (!taskContext) return;
+    setEditingGoalId(null);
+    setDraft({ ...newGoal(), projectId: taskContext.projectId, projectSectionId: taskContext.sectionId });
+    setShowAddSheet(true);
+    onTaskContextConsumed();
+  }, [taskContext]);
+
   const closeGoalEditor = () => {
     setShowAddSheet(false);
     setEditingGoalId(null);
@@ -2495,10 +2539,13 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   };
 
   const selectedGoalDetails = data.goals.find(g => g.id === selectedGoalDetailsId) ?? null;
+  const draftProject = data.projects.find(project => project.id === draft.projectId);
+  const draftProjectSections = draftProject?.sections ?? [];
 
   const handleSaveGoal = () => {
     if (!draft.title?.trim()) return;
     if (editingGoalId) {
+      const completeLargeTask = Boolean(draft.isLargeTask && Number(draft.progressPercent ?? 0) >= 100 && !data.goals.find(goal => goal.id === editingGoalId)?.completed);
       setData(prev => ({
         ...prev,
         goals: prev.goals.map(g =>
@@ -2516,10 +2563,16 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
                 subtasks: draft.subtasks ?? g.subtasks,
                 recurring: draft.recurring ?? g.recurring,
                 nextStepTitle: draft.nextStepTitle?.trim() || undefined,
+                projectId: draft.projectId ?? null,
+                projectSectionId: draft.projectSectionId ?? null,
+                isLargeTask: Boolean(draft.isLargeTask),
+                progressPercent: draft.isLargeTask ? Math.max(0, Math.min(100, Number(draft.progressPercent ?? 0))) : g.progressPercent,
+                progressUpdatedAt: draft.isLargeTask && draft.progressPercent !== g.progressPercent ? new Date().toISOString() : g.progressUpdatedAt,
               }
             : g
         ),
       }));
+      if (completeLargeTask) handleComplete(editingGoalId);
     } else {
       const baseGoal: Goal = {
         id: uid(),
@@ -2538,6 +2591,10 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
         recurring: draft.recurring ?? "none",
         archived: false,
         nextStepTitle: draft.nextStepTitle?.trim() || undefined,
+        projectId: draft.projectId ?? null,
+        projectSectionId: draft.projectSectionId ?? null,
+        isLargeTask: Boolean(draft.isLargeTask),
+        progressPercent: draft.isLargeTask ? Math.max(0, Math.min(100, Number(draft.progressPercent ?? 0))) : 0,
       };
 
       const goalsToAdd = (draft.recurring ?? "none") === "daily" || (draft.recurring ?? "none") === "weekly"
@@ -2545,6 +2602,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
         : [baseGoal];
 
       setData(prev => ({ ...prev, goals: [...prev.goals, ...goalsToAdd] }));
+      if (baseGoal.isLargeTask && (baseGoal.progressPercent ?? 0) >= 100) handleComplete(baseGoal.id);
     }
     closeGoalEditor();
   };
@@ -2649,7 +2707,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
         </div>
       </header>
 
-      <section className="goals-planner-hero" aria-label="Планирование дня">
+      {!projectFilter && <section className="goals-planner-hero" aria-label="Планирование дня">
         <div className="goals-planner-illustration" aria-hidden="true">
           <svg viewBox="0 0 130 120" fill="none"><path d="M19 21l9-7M108 87l9 8M104 12v12M98 18h12" stroke="#D9B46C" strokeWidth="2" strokeLinecap="round"/><g transform="rotate(-8 65 60)"><rect x="25" y="26" width="80" height="79" rx="13" fill="#EEF2FF"/><rect x="21" y="21" width="80" height="79" rx="13" fill="white" stroke="#DBE2F3" strokeWidth="2"/><path d="M21 34c0-7 6-13 13-13h54c7 0 13 6 13 13v11H21V34Z" fill="#549AF2"/><path d="M41 15v14M81 15v14" stroke="#BDD5FC" strokeWidth="6" strokeLinecap="round"/>{[0,1,2].flatMap(row => [0,1,2].map(col => <rect key={`${row}-${col}`} x={34+col*20} y={54+row*13} width="12" height="8" rx="2" fill={row===1 && col===1 ? '#BDD5FC' : '#E8ECF7'} />))}<circle cx="89" cy="83" r="18" fill="#549AF2" stroke="white" strokeWidth="3"/><path d="m81 83 5 5 10-11" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></g><path d="m12 67 3-7 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="#F6E6BB"/></svg>
         </div>
@@ -2659,10 +2717,10 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
           <span>Освободи время для важного. <Heart size={13} fill="currentColor" /></span>
         </div>
         <aside className="goals-planner-note"><Heart size={15} /><p>Маленький шаг сегодня.<br /><b>Большая перемена завтра.</b></p></aside>
-      </section>
+      </section>}
 
       <div className="goals-content">
-        <section className="goals-date-panel" aria-label="Выбор даты">
+        {!projectFilter && <section className="goals-date-panel" aria-label="Выбор даты">
           <div className="goals-date-heading">
             <div className="goals-date-current">
               <span><small>КАЛЕНДАРЬ</small><b>{selectedDay.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }).replace(/\s*г\.$/, "")}</b></span>
@@ -2682,7 +2740,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
               </button>
             ))}
           </div>
-        </section>
+        </section>}
 
         <div className="goals-filter-row">
           <div className="goals-filters" role="tablist" aria-label="Фильтр задач">
@@ -2695,7 +2753,9 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
           <span className="goals-filter-count">{totalVisibleGoals} {getGoalCountWord(totalVisibleGoals)}</span>
         </div>
 
-        <div className="goals-schedule-heading"><div><span><Clock3 size={17} /></span><div><h2>План на день</h2><p>Задачи, которые помогут тебе двигаться вперёд</p></div></div><span>{selectedDate === todayKey ? "Сегодня" : formatGoalDate(selectedDate)}</span></div>
+        {projectFilter && <div className="goals-project-filter"><span><FolderKanban size={14} />Проект: <b>{data.projects.find(project => project.id === projectFilter)?.name ?? "Проект"}{projectSectionFilter ? ` / ${data.projects.find(project => project.id === projectFilter)?.sections?.find(section => section.id === projectSectionFilter)?.name ?? "Раздел"}` : ""}</b></span><button type="button" onClick={onClearProjectFilter}>Показать все задачи <X size={13} /></button></div>}
+
+        <div className="goals-schedule-heading"><div><span><Clock3 size={17} /></span><div><h2>{projectFilter ? projectSectionFilter ? "Задачи раздела" : "Задачи проекта" : "План на день"}</h2><p>{projectFilter ? "Все активные и завершённые дела в одном месте" : "Задачи, которые помогут тебе двигаться вперёд"}</p></div></div><span>{projectFilter ? "Все даты" : selectedDate === todayKey ? "Сегодня" : formatGoalDate(selectedDate)}</span></div>
 
         {totalVisibleGoals === 0 ? (
           <div className="goals-empty-state">
@@ -2715,7 +2775,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
                   <AnimatePresence mode="popLayout">
                     {section.todos.map(goal => (
                       <motion.div key={goal.id} layout initial={{ opacity: 0, y: 12, scale: .99 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: .98 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
-                        <GoalCard goal={goal} expanded={expandedId === goal.id} overdue={isOverdueWeekGoal(goal) || isGoalOverdue(goal, selectedDate)} isCompleted={false} onToggleExpand={() => setExpandedId(expandedId === goal.id ? null : goal.id)} onEdit={() => openGoalEditor(goal)} onViewGoal={openGoalDetails} onToggleComplete={handleComplete} onDelete={handleDelete} onArchive={handleArchive} onToggleSubtask={handleToggleSubtask} />
+                        <GoalCard goal={goal} project={data.projects.find(project => project.id === goal.projectId)} onProgressChange={(value) => setData(prev => ({ ...prev, goals: prev.goals.map(item => item.id === goal.id ? { ...item, progressPercent: value, progressUpdatedAt: new Date().toISOString() } : item) }))} expanded={expandedId === goal.id} overdue={isOverdueWeekGoal(goal) || isGoalOverdue(goal, selectedDate)} isCompleted={false} onToggleExpand={() => setExpandedId(expandedId === goal.id ? null : goal.id)} onEdit={() => openGoalEditor(goal)} onViewGoal={openGoalDetails} onToggleComplete={handleComplete} onDelete={handleDelete} onArchive={handleArchive} onToggleSubtask={handleToggleSubtask} />
                       </motion.div>
                     ))}
                   </AnimatePresence>
@@ -2733,7 +2793,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
                     <AnimatePresence mode="popLayout">
                       {completedGoals.map(goal => (
                         <motion.div key={goal.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
-                          <GoalCard goal={goal} expanded={false} overdue={false} isCompleted onToggleExpand={() => {}} onEdit={() => openGoalEditor(goal)} onViewGoal={openGoalDetails} onToggleComplete={handleUncomplete} onDelete={handleDelete} onArchive={handleArchive} onToggleSubtask={handleToggleSubtask} />
+                          <GoalCard goal={goal} project={data.projects.find(project => project.id === goal.projectId)} onProgressChange={(value) => setData(prev => ({ ...prev, goals: prev.goals.map(item => item.id === goal.id ? { ...item, progressPercent: value, progressUpdatedAt: new Date().toISOString() } : item) }))} expanded={false} overdue={false} isCompleted onToggleExpand={() => {}} onEdit={() => openGoalEditor(goal)} onViewGoal={openGoalDetails} onToggleComplete={handleUncomplete} onDelete={handleDelete} onArchive={handleArchive} onToggleSubtask={handleToggleSubtask} />
                         </motion.div>
                       ))}
                     </AnimatePresence>
@@ -2877,8 +2937,27 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
             {editingGoalId && (draft.recurring === "daily" || draft.recurring === "weekly") && <p className="goal-repeat-note">Это задача из серии. Чтобы не менять остальные даты в серии, режим повтора здесь фиксирован.</p>}
           </section>
 
-          <section className="goal-editor-section">
-            <div className="goal-editor-section-heading"><span className="goal-editor-step">6</span><div><h3>Шаги задачи</h3><p>Разбей большое дело на небольшие</p></div></div>
+          <section className="goal-editor-section goal-project-section">
+            <div className="goal-editor-section-heading"><span className="goal-editor-step">6</span><div><h3>Проект</h3><p>Чтобы не потерять задачу среди дел</p></div></div>
+            <div className="goal-project-picker" role="radiogroup" aria-label="Проект задачи">
+              <button type="button" role="radio" aria-checked={!draft.projectId} className={!draft.projectId ? "is-selected" : ""} onClick={() => setDraft(d => ({ ...d, projectId: null, projectSectionId: null }))}>Без проекта</button>
+              {data.projects.map(project => <button key={project.id} type="button" role="radio" aria-checked={draft.projectId === project.id} className={draft.projectId === project.id ? "is-selected" : ""} style={{ "--project-color": project.color } as React.CSSProperties} onClick={() => setDraft(d => ({ ...d, projectId: project.id, projectSectionId: d.projectId === project.id ? d.projectSectionId : null }))}><i />{project.name}</button>)}
+            </div>
+            {draft.projectId && draftProjectSections.length > 0 && <div className="goal-project-section-pick"><span>Раздел <small>· необязательно</small></span><div className="goal-project-picker" role="radiogroup" aria-label="Раздел проекта"><button type="button" role="radio" aria-checked={!draft.projectSectionId} className={!draft.projectSectionId ? "is-selected" : ""} onClick={() => setDraft(d => ({ ...d, projectSectionId: null }))}>Без раздела</button>{draftProjectSections.map(section => <button key={section.id} type="button" role="radio" aria-checked={draft.projectSectionId === section.id} className={draft.projectSectionId === section.id ? "is-selected" : ""} style={{ "--project-color": draftProject?.color } as React.CSSProperties} onClick={() => setDraft(d => ({ ...d, projectSectionId: section.id }))}><i />{section.name}</button>)}</div></div>}
+            {data.projects.length === 0 && <p className="goal-project-hint">Создай проект во вкладке «Проекты» — он появится здесь.</p>}
+          </section>
+
+          <section className="goal-editor-section goal-task-mode-section">
+            <div className="goal-editor-section-heading"><span className="goal-editor-step">7</span><div><h3>Как отслеживать</h3><p>Выбери удобный способ для этой задачи</p></div></div>
+            <div className="goal-mode-picker" role="radiogroup" aria-label="Тип задачи">
+              <button type="button" role="radio" aria-checked={!draft.isLargeTask} className={!draft.isLargeTask ? "is-selected" : ""} onClick={() => setDraft(d => ({ ...d, isLargeTask: false }))}><Check size={17} /><span><b>Обычная задача</b><small>Отметить выполненной или разбить на шаги</small></span></button>
+              <button type="button" role="radio" aria-checked={Boolean(draft.isLargeTask)} className={draft.isLargeTask ? "is-selected" : ""} onClick={() => setDraft(d => ({ ...d, isLargeTask: true }))}><TrendingUp size={17} /><span><b>Большая задача</b><small>Например, разработать сайт или подготовить проект</small></span></button>
+            </div>
+            {draft.isLargeTask && <div className="goal-editor-large-progress"><div><span>Сколько уже сделано?</span><strong>{draft.progressPercent ?? 0}%</strong></div><input type="range" min="0" max="100" step="1" value={draft.progressPercent ?? 0} style={{ background: `linear-gradient(to right, #549af2 ${draft.progressPercent ?? 0}%, #dfe8f3 ${draft.progressPercent ?? 0}%)` }} aria-label="Процент готовности большой задачи" onChange={e => setDraft(d => ({ ...d, progressPercent: Number(e.target.value) }))} /><div className="goal-editor-range-labels"><span>Только начал</span><span>Готово</span></div></div>}
+          </section>
+
+          {!draft.isLargeTask && <section className="goal-editor-section">
+            <div className="goal-editor-section-heading"><span className="goal-editor-step">8</span><div><h3>Шаги задачи</h3><p>Разбей большое дело на небольшие</p></div></div>
             <div className="goal-draft-subtasks">
               {(draft.subtasks ?? []).map(s => (
                 <div key={s.id} className="flex items-center gap-2">
@@ -2907,7 +2986,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
                 <Plus size={18} /><span>Добавить шаг</span>
               </button>
             </div>
-          </section>
+          </section>}
 
           <section className="goal-editor-section">
             <div className="goal-editor-section-heading"><span className="goal-editor-step">7</span><div><h3>Следующий шаг</h3><p>Он появится, когда эта задача будет выполнена</p></div></div>
@@ -3526,9 +3605,11 @@ function LegacyGoalCard({
 }
 
 function GoalCard({
-  goal, expanded, overdue, isCompleted, onToggleExpand, onEdit, onViewGoal, onToggleComplete, onDelete, onArchive, onToggleSubtask,
+  goal, project, onProgressChange, expanded, overdue, isCompleted, onToggleExpand, onEdit, onViewGoal, onToggleComplete, onDelete, onArchive, onToggleSubtask,
 }: {
   goal: Goal;
+  project?: Project;
+  onProgressChange: (value: number) => void;
   expanded: boolean;
   overdue?: boolean;
   isCompleted: boolean;
@@ -3544,9 +3625,65 @@ function GoalCard({
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [pendingSubtask, setPendingSubtask] = useState<string | null>(null);
+  const [progressPreview, setProgressPreview] = useState<number | null>(null);
+  const [holdingLargeProgress, setHoldingLargeProgress] = useState(false);
   const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressHoldTimer = useRef<number | null>(null);
+  const progressFrame = useRef<number | null>(null);
+  const progressStartedAt = useRef(0);
+  const progressStartValue = useRef(0);
+  const progressPreviewValue = useRef(0);
+  const progressHoldActive = useRef(false);
   const reduceMotion = useReducedMotion();
-  useEffect(() => () => { if (finishTimer.current) clearTimeout(finishTimer.current); }, []);
+  useEffect(() => () => {
+    if (finishTimer.current) clearTimeout(finishTimer.current);
+    if (progressHoldTimer.current) window.clearTimeout(progressHoldTimer.current);
+    if (progressFrame.current !== null) cancelAnimationFrame(progressFrame.current);
+  }, []);
+  const beginLargeProgressHold = () => {
+    if (!goal.isLargeTask || isCompleted || finishing || progressHoldTimer.current || progressHoldActive.current) return;
+    const initial = calcGoalProgress(goal);
+    progressStartValue.current = initial;
+    progressPreviewValue.current = initial;
+    setProgressPreview(initial);
+    progressHoldTimer.current = window.setTimeout(() => {
+      progressHoldTimer.current = null;
+      progressHoldActive.current = true;
+      setHoldingLargeProgress(true);
+      progressStartedAt.current = performance.now();
+      const animate = (now: number) => {
+        const next = Math.min(100, progressStartValue.current + (now - progressStartedAt.current) * 0.018);
+        progressPreviewValue.current = next;
+        setProgressPreview(next);
+        if (next < 100) progressFrame.current = requestAnimationFrame(animate);
+        else {
+          progressHoldActive.current = false;
+          setHoldingLargeProgress(false);
+          setProgressPreview(null);
+          onProgressChange(100);
+          finishWithAnimation(() => onToggleComplete(goal.id));
+        }
+      };
+      progressFrame.current = requestAnimationFrame(animate);
+    }, 320);
+  };
+  const endLargeProgressHold = () => {
+    if (progressHoldTimer.current) {
+      window.clearTimeout(progressHoldTimer.current);
+      progressHoldTimer.current = null;
+    }
+    if (progressFrame.current !== null) {
+      cancelAnimationFrame(progressFrame.current);
+      progressFrame.current = null;
+    }
+    if (progressHoldActive.current) {
+      const next = Math.round(progressPreviewValue.current);
+      if (next > progressStartValue.current) onProgressChange(next);
+    }
+    progressHoldActive.current = false;
+    setHoldingLargeProgress(false);
+    setProgressPreview(null);
+  };
   const finishWithAnimation = (action: () => void, subtaskId?: string) => {
     if (finishTimer.current) return;
     if (reduceMotion) { action(); return; }
@@ -3566,6 +3703,8 @@ function GoalCard({
   };
   const completedSubtasks = goal.subtasks.filter(subtask => subtask.done).length;
   const progress = goal.subtasks.length ? Math.round(completedSubtasks / goal.subtasks.length * 100) : 0;
+  const ringProgress = Math.round(progressPreview ?? calcGoalProgress(goal));
+  const ringColor = project?.color ?? "#549AF2";
   const priorityColor = overdue ? "#D76969" : PRIORITY_COLORS[goal.priority];
   const dueLabel = goal.deadline ? formatGoalDate(goal.deadline) : null;
   const completedTimestamp = goal.completedAt ? new Date(goal.completedAt) : null;
@@ -3573,9 +3712,10 @@ function GoalCard({
   const recurrenceLabel = goal.recurring === "daily" ? "Каждый день" : goal.recurring === "weekly" ? "Каждую неделю" : null;
   const hasDetails = Boolean(goal.description?.trim() || goal.subtasks.length > 0);
   const TaskIcon = TASK_ICONS.find(item => item.id === goal.icon)?.Icon ?? Target;
+  const projectSection = project?.sections?.find(section => section.id === goal.projectSectionId);
 
   return (
-    <article className={`goal-card ${finishing ? "is-finishing" : ""} ${isCompleted ? "is-completed" : ""} ${overdue ? "is-overdue" : ""}`}>
+    <article className={`goal-card ${finishing ? "is-finishing" : ""} ${isCompleted ? "is-completed" : ""} ${overdue ? "is-overdue" : ""} ${goal.isLargeTask ? "is-large-task" : ""}`} style={project ? { "--goal-project-color": project.color } as React.CSSProperties : undefined}>
       {goal.time && <div className="planner-task-time"><Clock3 size={13} /><time dateTime={goal.time}>{goal.time}</time></div>}
       <div className="goal-card-main">
         <button
@@ -3594,8 +3734,9 @@ function GoalCard({
         <span className="planner-task-icon" aria-hidden="true" style={{ "--task-tone": PRIORITY_COLORS[goal.priority] } as React.CSSProperties}>{isCompleted ? <Check size={21} /> : <TaskIcon size={22} />}</span>
 
         <div className="goal-card-body">
-          <div className="goal-card-title-row">
+              <div className="goal-card-title-row">
             <button type="button" className="goal-card-title-button" aria-expanded={expanded} onClick={() => isCompleted ? onViewGoal(goal) : onToggleExpand()}>
+              {project && <span className="goal-project-prefix"><i style={{ backgroundColor: project.color }} />{project.name}{projectSection && <em> / {projectSection.name}</em>}</span>}
               <span className={`goal-card-title ${isCompleted ? "is-crossed" : ""}`}>{goal.title}</span>
               {(hasDetails || isCompleted) && <ChevronDown size={15} className={`goal-card-disclosure ${expanded ? "is-open" : ""}`} />}
             </button>
@@ -3622,14 +3763,22 @@ function GoalCard({
             <span className="goal-group-chip">{GROUP_LABELS[goal.group]}</span>
             {goal.continuationFromTitle && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${isCompleted ? "border-white/30 bg-white/15 text-white" : "border-[#C8DDF8] bg-[#EAF3FF] text-[#285EA4]"}`}><ArrowRight size={12} />Продолжение: {goal.continuationFromTitle}</span>}
             {goal.nextStepTitle && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${isCompleted ? "border-white/30 bg-white/15 text-white" : "border-[#D9E2EE] bg-white text-[#526174]"}`}><ArrowRight size={12} />Дальше: {goal.nextStepTitle}</span>}
+            {goal.isLargeTask && <span className="goal-large-task-chip"><TrendingUp size={12} />Большая задача</span>}
             {dueLabel && <span className={`goal-meta-detail ${overdue && !isCompleted ? "is-overdue" : ""}`}><CalendarDays size={13} />До {dueLabel}</span>}
             {recurrenceLabel && <span className="goal-meta-detail"><Clock3 size={13} />{recurrenceLabel}</span>}
             {isCompleted && completedDateLabel && <span className="goal-meta-detail goal-completed-date"><Check size={13} />{completedDateLabel}</span>}
           </div>
         </div>
+        {goal.isLargeTask && <div className="goal-large-ring-wrap" onClick={event => event.stopPropagation()}>
+          <button type="button" className={`goal-large-ring-button ${holdingLargeProgress ? "is-filling" : ""}`} disabled={isCompleted || finishing} aria-label={`Прогресс задачи «${goal.title}»: ${ringProgress} процентов. Нажмите и удерживайте, чтобы увеличить`} title="Зажми, чтобы добавить прогресс" onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); beginLargeProgressHold(); }} onPointerUp={endLargeProgressHold} onPointerCancel={endLargeProgressHold} onContextMenu={event => event.preventDefault()} onKeyDown={event => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); beginLargeProgressHold(); } }} onKeyUp={event => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); endLargeProgressHold(); } }}>
+            <svg className="goal-large-ring" viewBox="0 0 64 64" aria-hidden="true"><circle className="goal-large-ring-track" cx="32" cy="32" r="25" /><circle className="goal-large-ring-value" cx="32" cy="32" r="25" pathLength="100" strokeDasharray={`${progressPreview ?? calcGoalProgress(goal)} 100`} style={{ stroke: ringColor }} /></svg>
+            <span className="goal-large-ring-number">{ringProgress}<small>%</small></span>
+          </button>
+          <span className="goal-large-ring-hint">{holdingLargeProgress ? "Отпусти" : isCompleted ? "Готово" : "зажми"}</span>
+        </div>}
       </div>
 
-      {goal.subtasks.length > 0 && (
+      {!goal.isLargeTask && goal.subtasks.length > 0 && (
         <div className="goal-card-progress">
           <div className="goal-progress-heading"><span>Шаги</span><b>{completedSubtasks} из {goal.subtasks.length}</b></div>
           <div className="goal-progress-track"><i style={{ width: `${progress}%` }} /></div>
@@ -3678,7 +3827,7 @@ function GoalCard({
 // ═══════════════════════════════════════════════════
 
 function NutritionTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData) => AppData) => void }) {
-  const [subTab, setSubTab] = useState<"diary" | "journal">("diary");
+  const [subTab, setSubTab] = useState<"wellbeing" | "diary" | "journal">("wellbeing");
   const todayKey = getDateKey();
   const todayDiary = data.foodDiary[todayKey] ?? EMPTY_DIARY;
   const todayWater = data.water[todayKey] ?? 0;
@@ -3725,12 +3874,12 @@ function NutritionTab({ data, setData }: { data: AppData; setData: (fn: (p: AppD
     <div className="app-page nutrition-page pt-14 pb-6">
       {/* Header */}
       <div className="px-4 mb-4">
-        <h1 className="text-xl font-semibold text-[#1A1A2E] mb-4">Питание и дневник</h1>
+        <h1 className="text-xl font-semibold text-[#1A1A2E] mb-4">Питание и самочувствие</h1>
         <div className="flex bg-[#F0F0EE] rounded-xl p-0.5">
-          {([["diary", "Питание"], ["journal", "Дневник"]] as [string, string][]).map(([id, label]) => (
+          {([["wellbeing", "Дневник еды"], ["diary", "Калории"], ["journal", "Заметки"]] as [string, string][]).map(([id, label]) => (
             <button
               key={id}
-              onClick={() => setSubTab(id as "diary" | "journal")}
+              onClick={() => setSubTab(id as "wellbeing" | "diary" | "journal")}
               className={`flex-1 py-2 rounded-[10px] text-[13px] font-medium transition-all ${subTab === id ? "bg-white text-[#1A1A2E] shadow-sm" : "text-[#8A8A99]"}`}
             >
               {label}
@@ -3739,6 +3888,7 @@ function NutritionTab({ data, setData }: { data: AppData; setData: (fn: (p: AppD
         </div>
       </div>
 
+      {subTab === "wellbeing" && <GutDiary value={data.gutDiary} onChange={update => setData(prev => ({ ...prev, gutDiary: update(prev.gutDiary ?? EMPTY_GUT_DIARY) }))} />}
       {subTab === "diary" && (
         <DiarySubTab
           todayDiary={todayDiary}
@@ -4908,6 +5058,138 @@ function SettingsScreen({
   );
 }
 
+function ProjectTaskList({ tasks, onToggle }: { tasks: Goal[]; onToggle: (task: Goal) => void }) {
+  const active = tasks.filter(task => !task.completed);
+  const done = tasks.filter(task => task.completed);
+  const row = (task: Goal) => <motion.div layout key={task.id} className={`project-action-task ${task.completed ? "is-completed" : ""}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+    <button type="button" className="project-task-check" aria-label={`${task.completed ? "Вернуть в работу" : "Завершить"}: ${task.title}`} aria-pressed={task.completed} onClick={() => onToggle(task)}><Check size={17} /></button>
+    <div className="project-action-task-copy"><strong>{task.title}</strong><div>{task.time && <span><Clock3 size={12} />{task.time}</span>}{task.scheduledFor && <span>{formatGoalDate(task.scheduledFor)}</span>}<span className={`project-task-priority priority-${task.priority}`}>{task.priority === "high" ? "Высокий" : task.priority === "medium" ? "Средний" : "Низкий"} приоритет</span>{task.subtasks.length > 0 && <span>{task.subtasks.filter(step => step.done).length}/{task.subtasks.length} шагов</span>}</div>{task.isLargeTask && !task.completed && <div className="project-inline-progress"><i><em style={{ width: `${calcGoalProgress(task)}%` }} /></i><b>{calcGoalProgress(task)}%</b></div>}</div>
+  </motion.div>;
+  return <div className="project-action-tasks"><AnimatePresence initial={false}>{active.map(row)}</AnimatePresence>{!active.length && <p className="project-tasks-clear"><Check size={17} />{done.length ? "Всё сделано. Отличная работа!" : "Здесь появятся задачи раздела"}</p>}{done.length > 0 && <details className="project-done-tasks"><summary><Check size={14} />Выполнено <b>{done.length}</b><ChevronDown size={14} /></summary><div>{done.map(row)}</div></details>}</div>;
+}
+
+function ProjectsTab({ data, setData, onOpenProjectTasks, onAddTask }: { data: AppData; setData: (fn: (p: AppData) => AppData) => void; onOpenProjectTasks: (id: string, sectionId?: string) => void; onAddTask: (id: string, sectionId?: string | null) => void }) {
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [color, setColor] = useState("#549AF2");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [sectionDraft, setSectionDraft] = useState("");
+  const [taskSearch, setTaskSearch] = useState("");
+  const toggleProjectTask = (task: Goal) => {
+    const continuationId = uid();
+    setData(prev => {
+      const current = prev.goals.find(item => item.id === task.id);
+      if (!current) return prev;
+      const completed = !current.completed;
+      const date = current.scheduledFor ?? getDateKey();
+      const now = new Date().toISOString();
+      const goals = prev.goals.map(item => item.id === current.id ? { ...item, completed, completedAt: completed ? now : null, progressUpdatedAt: now, ...(item.isLargeTask ? { progressPercent: completed ? 100 : Math.min(item.progressPercent ?? 0, 95) } : {}), subtasks: item.subtasks.map(step => ({ ...step, done: completed })), recurrenceState: { ...(item.recurrenceState ?? {}), [date]: { completed, missed: false, missedStreak: 0 } } } : item);
+      return { ...prev, goals: completed ? appendContinuation(goals, current.id, date, continuationId) : removePendingContinuation(goals, current.id) };
+    });
+  };
+  const colors = ["#549AF2", "#8B6FE8", "#36A88A", "#E49A43", "#E16F83", "#536A8D", "#61A6B8", "#718A41"];
+  const activeProjects = data.projects.map(project => {
+    const tasks = data.goals.filter(goal => goal.projectId === project.id && !goal.archived);
+    const done = tasks.filter(goal => goal.completed).length;
+    const dates = [...tasks.flatMap(goal => [goal.progressUpdatedAt, goal.completedAt, goal.createdAt]), project.updatedAt, ...(project.sections ?? []).map(section => section.createdAt)].filter(Boolean) as string[];
+    dates.sort();
+    const lastDate = dates[dates.length - 1] ?? project.createdAt;
+    const lastDay = getDateKey(new Date(lastDate.length === 10 ? `${lastDate}T12:00:00` : lastDate));
+    const inactivity = Math.max(0, Math.floor((new Date(`${getDateKey()}T12:00:00`).getTime() - new Date(`${lastDay}T12:00:00`).getTime()) / 86400000));
+    return { project, tasks, done, lastDay, inactivity };
+  }).sort((a, b) => b.inactivity - a.inactivity);
+  const selectedProject = data.projects.find(project => project.id === selectedProjectId) ?? null;
+  const selectedProjectTasks = selectedProject ? data.goals.filter(goal => goal.projectId === selectedProject.id && !goal.archived) : [];
+  const selectedProjectActiveTasks = selectedProjectTasks.filter(goal => !goal.completed);
+  const selectedProjectCompletedTasks = selectedProjectTasks.filter(goal => goal.completed);
+  const selectedProjectProgress = selectedProjectTasks.length ? Math.round(selectedProjectTasks.reduce((sum, task) => sum + (task.completed ? 100 : calcGoalProgress(task)), 0) / selectedProjectTasks.length) : 0;
+  const selectedProjectIdleDays = activeProjects.find(item => item.project.id === selectedProject?.id)?.inactivity ?? 0;
+  const openEditor = (project?: Project) => { setEditingId(project?.id ?? null); setName(project?.name ?? ""); setColor(project?.color ?? colors[0]); setEditorOpen(true); };
+  const saveProject = () => {
+    const clean = name.trim();
+    if (!clean) return;
+    if (editingId) setData(prev => ({ ...prev, projects: prev.projects.map(project => project.id === editingId ? { ...project, name: clean, color, updatedAt: new Date().toISOString() } : project) }));
+    else setData(prev => ({ ...prev, projects: [...prev.projects, { id: uid(), name: clean, color, createdAt: getDateKey(), updatedAt: new Date().toISOString(), sections: [] }] }));
+    setEditorOpen(false);
+  };
+  const deleteProject = (project: Project) => {
+    if (!window.confirm(`Удалить проект «${project.name}»? Его задачи останутся без проекта.`)) return;
+    setData(prev => ({ ...prev, projects: prev.projects.filter(item => item.id !== project.id), goals: prev.goals.map(goal => goal.projectId === project.id ? { ...goal, projectId: null, projectSectionId: null } : goal) }));
+    setExpandedId(null);
+    if (selectedProjectId === project.id) setSelectedProjectId(null);
+  };
+  const addSection = () => {
+    const clean = sectionDraft.trim();
+    if (!clean || !selectedProject) return;
+    const section: ProjectSection = { id: uid(), name: clean, createdAt: getDateKey() };
+    setData(prev => ({ ...prev, projects: prev.projects.map(project => project.id === selectedProject.id ? { ...project, updatedAt: new Date().toISOString(), sections: [...(project.sections ?? []), section] } : project) }));
+    setSectionDraft("");
+  };
+  const removeSection = (projectId: string, section: ProjectSection) => {
+    if (!window.confirm(`Удалить раздел «${section.name}»? Его задачи останутся в проекте без раздела.`)) return;
+    setData(prev => ({ ...prev, projects: prev.projects.map(project => project.id === projectId ? { ...project, updatedAt: new Date().toISOString(), sections: (project.sections ?? []).filter(item => item.id !== section.id) } : project), goals: prev.goals.map(goal => goal.projectSectionId === section.id ? { ...goal, projectSectionId: null } : goal) }));
+  };
+  const dayWord = (count: number) => count === 1 ? "день" : count >= 2 && count <= 4 ? "дня" : "дней";
+  return <div className="app-page projects-page pt-14 pb-8">
+    {!selectedProject && <>
+    <header className="projects-header"><div><p className="projects-eyebrow"><FolderKanban size={16} />ПРОЕКТЫ И ИДЕИ</p><h1>Проекты</h1><p>Держи важные дела в поле зрения и возвращайся к ним маленькими шагами.</p></div><button type="button" className="projects-create-button" onClick={() => openEditor()}><Plus size={17} />Новый проект</button></header>
+    <section className="projects-summary" aria-label="Сводка проектов">
+      <div><span>В работе</span><strong>{activeProjects.length}</strong><small>проектов</small></div>
+      <div><span>Активные задачи</span><strong>{activeProjects.reduce((sum, item) => sum + item.tasks.filter(task => !task.completed).length, 0)}</strong><small>можно продолжить</small></div>
+      <div><span>Уже завершено</span><strong>{activeProjects.reduce((sum, item) => sum + item.done, 0)}</strong><small>задач по проектам</small></div>
+    </section>
+    {activeProjects.length ? <div className="projects-grid">{activeProjects.map(({ project, tasks, done, lastDay, inactivity }) => {
+      const expanded = expandedId === project.id;
+      const activeTasks = tasks.filter(task => !task.completed);
+      const completedTasks = tasks.filter(task => task.completed);
+      const projectProgress = tasks.length ? Math.round(tasks.reduce((sum, task) => sum + (task.completed ? 100 : calcGoalProgress(task)), 0) / tasks.length) : 0;
+      return <article className={`project-card ${expanded ? "is-expanded" : ""}`} key={project.id} style={{ "--project-color": project.color } as React.CSSProperties}>
+        <div className="project-card-top"><button type="button" className="project-card-summary-open" onClick={() => setSelectedProjectId(project.id)}><span className="project-card-icon"><FolderKanban size={21} /></span><span><b>{project.name}</b><small>Открыть сводку проекта <ArrowUpRight size={12} /></small></span></button><div className="project-card-actions"><button type="button" aria-label={`Изменить проект ${project.name}`} onClick={() => openEditor(project)}><Pencil size={15} /></button><button type="button" aria-label={`Удалить проект ${project.name}`} onClick={() => deleteProject(project)}><Trash2 size={15} /></button></div></div>
+        <div className="project-card-stats"><span><b>{activeTasks.length}</b> в работе</span><span><b>{done}</b> готово</span><span><b>{(project.sections ?? []).length}</b> разделов</span></div>
+        <div className="project-card-progress"><div><span>Общий прогресс</span><b>{projectProgress}%</b></div><i><em style={{ width: `${projectProgress}%` }} /></i></div>
+        <div className={`project-activity ${inactivity >= 7 ? "needs-attention" : ""}`}><span className="project-activity-dot" /><span>{tasks.length === 0 ? "Добавь первую задачу" : inactivity === 0 ? "Была активность сегодня" : `Без движения ${inactivity} ${dayWord(inactivity)}`}</span><small>{tasks.length ? `последний шаг · ${formatGoalDate(lastDay)}` : "проект ждёт начала"}</small></div>
+        <button type="button" className="project-tasks-toggle" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : project.id)}><span>{tasks.length ? `Показать задачи · ${tasks.length}` : "Пока нет задач"}</span><ChevronDown size={16} /></button>
+        {expanded && <div className="project-task-list">{activeTasks.length ? activeTasks.map(task => <div className="project-task-row" key={task.id}><span className="project-task-state" /><span>{task.projectSectionId && <small>{project.sections?.find(section => section.id === task.projectSectionId)?.name} · </small>}{task.title}</span>{task.isLargeTask && <b>{calcGoalProgress(task)}%</b>}</div>) : tasks.length ? <p className="project-no-tasks">Все задачи завершены — отличная работа!</p> : <p className="project-no-tasks">Добавь первую задачу к проекту во вкладке «Задачи».</p>}{completedTasks.length > 0 && <><p className="project-completed-count"><Check size={13} />Уже сделано · {completedTasks.length}</p>{completedTasks.map(task => <div className="project-task-row is-completed" key={task.id}><span className="project-task-state"><Check size={9} /></span><span>{task.projectSectionId && <small>{project.sections?.find(section => section.id === task.projectSectionId)?.name} · </small>}{task.title}</span></div>)}</>}<button type="button" className="project-open-tasks" onClick={() => onOpenProjectTasks(project.id)}>Задачи этого проекта <ArrowRight size={14} /></button></div>}
+      </article>;
+    })}</div> : <section className="projects-empty"><span><FolderKanban size={25} /></span><h2>Пока нет проектов</h2><p>Создай проект — например, «Сайт для тюбинга». Потом выбирай его при добавлении задачи, и все связанные дела будут собраны вместе.</p><button type="button" onClick={() => openEditor()}><Plus size={16} />Создать первый проект</button></section>}
+    </>}
+    {selectedProject && <main className="project-detail-page" style={{ "--project-color": selectedProject.color } as React.CSSProperties}>
+      <div className="project-detail-topbar"><button type="button" className="project-back-button" onClick={() => setSelectedProjectId(null)}><ArrowLeft size={17} />Все проекты</button><div className="project-detail-tools"><button type="button" onClick={() => onAddTask(selectedProject.id, null)}><Plus size={16} />Новая задача</button><button type="button" className="project-edit-button" aria-label="Изменить проект" onClick={() => openEditor(selectedProject)}><Pencil size={16} /></button><button type="button" className="project-delete-button" aria-label="Удалить проект" onClick={() => deleteProject(selectedProject)}><Trash2 size={16} /></button></div></div>
+      <div className="project-detail-heading"><span className="project-detail-icon"><FolderKanban size={25} /></span><div><p>ПРОЕКТ</p><h1>{selectedProject.name}</h1><span>Все задачи, разделы и прогресс — в одном месте</span></div></div>
+      <div className="project-dashboard">
+        <section className="project-dashboard-hero" style={{ "--project-color": selectedProject.color } as React.CSSProperties}>
+          <div className="project-dashboard-title"><span className="project-dashboard-icon"><FolderKanban size={22} /></span><div><small>ПРОГРЕСС И СТАТИСТИКА</small><h2>Сводка проекта</h2></div></div>
+          <div className="project-dashboard-progress"><div><span>Общий прогресс</span><b>{selectedProjectProgress}%</b></div><i><em style={{ width: `${selectedProjectProgress}%` }} /></i></div>
+          <div className="project-dashboard-metrics"><div><b>{selectedProjectTasks.length}</b><span>всего задач</span></div><div><b>{selectedProjectActiveTasks.length}</b><span>в работе</span></div><div><b>{selectedProjectCompletedTasks.length}</b><span>выполнено</span></div><div><b>{selectedProjectIdleDays}</b><span>дней без дела</span></div></div>
+        </section>
+        <div className="project-dashboard-actions"><button type="button" onClick={() => onAddTask(selectedProject.id, null)}><Plus size={15} />Новая задача</button><button type="button" onClick={() => onOpenProjectTasks(selectedProject.id)}>Все задачи проекта <ArrowRight size={14} /></button></div>
+        <div className="project-dashboard-section-head"><div><h3>Разделы проекта</h3><p>Разложи работу по направлениям</p></div><span>{(selectedProject.sections ?? []).length}</span></div>
+        <form className="project-section-add" onSubmit={event => { event.preventDefault(); addSection(); }}><input value={sectionDraft} onChange={event => setSectionDraft(event.target.value)} maxLength={40} placeholder="Например, сайт, Директ, Яндекс" aria-label="Название нового раздела" /><button type="submit" disabled={!sectionDraft.trim()}><Plus size={15} /><span>Раздел</span></button></form>
+        {(selectedProject.sections ?? []).length === 0 && <div className="project-dashboard-empty"><FolderKanban size={18} /><span>Добавь раздел, например «Сайт» или «Реклама» — и веди задачи отдельно.</span></div>}
+        <label className="project-task-search"><span><Target size={16} />Найти задачу</span><input value={taskSearch} onChange={event => setTaskSearch(event.target.value)} placeholder="Название задачи…" /></label>
+        {[...(selectedProject.sections ?? []).map(section => ({ id: section.id as string | null, name: section.name, section })), { id: null, name: "Без раздела", section: null }].filter(bucket => bucket.id || selectedProjectTasks.some(task => !task.projectSectionId)).map(bucket => {
+          const allTasks = selectedProjectTasks.filter(task => (task.projectSectionId ?? null) === bucket.id);
+          const tasks = allTasks.filter(task => task.title.toLocaleLowerCase().includes(taskSearch.trim().toLocaleLowerCase()));
+          if (taskSearch.trim() && !tasks.length) return null;
+          const completed = allTasks.filter(task => task.completed).length;
+          return <section className="project-section-card" key={bucket.id ?? "unassigned"}>
+            <div className="project-section-title-row"><span className="project-section-mark" style={{ background: selectedProject.color }} /><div><h4>{bucket.name}</h4><p>{allTasks.length - completed} в работе · {completed} выполнено</p></div>{bucket.section && <button type="button" aria-label={`Удалить раздел ${bucket.name}`} onClick={() => removeSection(selectedProject.id, bucket.section!)}><Trash2 size={15} /></button>}</div>
+            <ProjectTaskList tasks={tasks} onToggle={toggleProjectTask} />
+            <div className="project-section-actions"><button type="button" className="project-section-add-task" onClick={() => onAddTask(selectedProject.id, bucket.id)}><Plus size={15} />Добавить задачу</button>{bucket.id && allTasks.length > 0 && <button type="button" onClick={() => onOpenProjectTasks(selectedProject.id, bucket.id!)}>Открыть в задачах <ArrowUpRight size={14} /></button>}</div>
+          </section>;
+        })}
+        {taskSearch.trim() && !selectedProjectTasks.some(task => task.title.toLocaleLowerCase().includes(taskSearch.trim().toLocaleLowerCase())) && <div className="project-dashboard-empty">Ничего не найдено. Попробуй другое название.</div>}
+        {selectedProjectTasks.length === 0 && <div className="project-dashboard-empty"><Sparkles size={17} /><span>Первый шаг — выбери раздел и добавь туда задачу. Она появится и в общей вкладке «Задачи».</span></div>}
+      </div>
+    </main>}
+    <BottomSheet open={editorOpen} onClose={() => setEditorOpen(false)} title={editingId ? "Изменить проект" : "Новый проект"}>
+      <div className="project-editor"><label htmlFor="project-name">Название проекта</label><input id="project-name" autoFocus value={name} maxLength={56} onChange={event => setName(event.target.value)} placeholder="Например, сайт для тюбинга" /><div className="project-color-heading"><span>Цвет проекта</span><b>{color}</b></div><div className="project-color-picker" role="radiogroup" aria-label="Цвет проекта">{colors.map(value => <button key={value} type="button" role="radio" aria-checked={color === value} aria-label={`Выбрать цвет ${value}`} style={{ backgroundColor: value }} onClick={() => setColor(value)}>{color === value && <Check size={16} />}</button>)}</div><p>Цвет поможет сразу узнавать задачи этого проекта в списке.</p><button className="project-save-button" type="button" disabled={!name.trim()} onClick={saveProject}>{editingId ? "Сохранить проект" : "Создать проект"}</button></div>
+    </BottomSheet>
+  </div>;
+}
+
 // ═══════════════════════════════════════════════════
 // BOTTOM NAV
 // ═══════════════════════════════════════════════════
@@ -4919,6 +5201,7 @@ const TABS: { id: AppTab; label: string }[] = [
   { id: "home",      label: "Главная"  },
   { id: "work",      label: "Работа"   },
   { id: "goals",     label: "Задачи"     },
+  { id: "projects",  label: "Проекты"   },
   { id: "nutrition", label: "Питание"  },
   { id: "habits",    label: "Зависимости" },
 ];
@@ -4952,6 +5235,7 @@ export function BottomNav({
               {tab.id === "home"      && <IcoHome      active={isActive} />}
               {tab.id === "work"      && <IcoWork      active={isActive} />}
               {tab.id === "goals"     && <IcoTarget    active={isActive} />}
+              {tab.id === "projects"  && <FolderKanban size={22} strokeWidth={isActive ? 2 : 1.5} />}
               {tab.id === "nutrition" && <IcoLeaf      active={isActive} />}
               {tab.id === "habits"    && <IcoChain     active={isActive} />}
               <span className="whitespace-nowrap text-[10px] font-medium leading-3">{tab.label}</span>
@@ -4971,6 +5255,9 @@ export default function App() {
   const shouldReduceMotion = useReducedMotion();
   const [data, setDataRaw] = useState<AppData>(loadData);
   const [activeTab, setActiveTab] = useState<AppTab>("home");
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+  const [projectSectionFilter, setProjectSectionFilter] = useState<string | null>(null);
+  const [taskContext, setTaskContext] = useState<{ projectId: string; sectionId: string | null } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [telegramUserId, setTelegramUserId] = useState<number | null>(null);
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
@@ -5060,9 +5347,11 @@ useEffect(() => {
             ? { ...prev.workActivity, ...remote.workActivity }
             : prev.workActivity,
           goals: (remote.goals?.length ?? 0) > 0 ? remote.goals : prev.goals,
+          projects: Array.isArray(remote.projects) ? remote.projects : prev.projects,
           foodDiary: Object.keys(remote.foodDiary ?? {}).length > 0
             ? { ...prev.foodDiary, ...remote.foodDiary }
             : prev.foodDiary,
+          gutDiary: remote.gutDiary ?? prev.gutDiary ?? EMPTY_GUT_DIARY,
           myMenu: (remote.myMenu?.length ?? 0) > 0 ? remote.myMenu : prev.myMenu,
           water: Object.keys(remote.water ?? {}).length > 0
             ? { ...prev.water, ...remote.water }
@@ -5162,7 +5451,8 @@ useEffect(() => {
           >
             {activeTab === "home" && <HomeTab data={data} setData={setData} onOpenSettings={() => setShowSettings(true)} onNavigate={setActiveTab} />}
             {activeTab === "work" && <WorkTab data={data} setData={setData} />}
-            {activeTab === "goals" && <GoalsTab data={data} setData={setData} />}
+            {activeTab === "goals" && <GoalsTab data={data} setData={setData} projectFilter={projectFilter} projectSectionFilter={projectSectionFilter} taskContext={taskContext} onClearProjectFilter={() => { setProjectFilter(null); setProjectSectionFilter(null); }} onTaskContextConsumed={() => setTaskContext(null)} />}
+            {activeTab === "projects" && <ProjectsTab data={data} setData={setData} onOpenProjectTasks={(id, sectionId) => { setProjectFilter(id); setProjectSectionFilter(sectionId ?? null); setActiveTab("goals"); }} onAddTask={(id, sectionId) => { setProjectFilter(id); setProjectSectionFilter(sectionId ?? null); setTaskContext({ projectId: id, sectionId: sectionId ?? null }); setActiveTab("goals"); }} />}
             {activeTab === "nutrition" && <NutritionTab data={data} setData={setData} />}
             {activeTab === "habits" && <HabitsTab data={data} setData={setData} />}
           </motion.div>

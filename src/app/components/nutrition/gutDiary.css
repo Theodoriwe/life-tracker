@@ -1,0 +1,172 @@
+.gut-diary { --gut-ink:#263b54; --gut-muted:#65788e; --gut-accent:#549af2; display:grid; gap:20px; padding:0 16px 24px; color:var(--gut-ink); }
+.gut-diary button, .gut-diary input, .gut-diary select, .gut-diary textarea { font:inherit; }
+.gut-diary button { cursor:pointer; }
+.gut-diary button:disabled { cursor:default; opacity:.45; }
+.gut-diary button:focus-visible, .gut-diary summary:focus-visible { outline:3px solid #89b8f2; outline-offset:3px; }
+.gut-diary a { color:#326bb0; text-decoration:underline; text-underline-offset:3px; }
+.gut-diary h2, .gut-diary h3, .gut-diary h4, .gut-diary p { margin:0; }
+.gut-welcome { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:28px; border:1px solid #dce8f7; border-radius:24px; background:#edf5ff; }
+.gut-eyebrow { display:inline-flex; align-items:center; gap:7px; color:#426b9a; font-size:10px; font-weight:750; letter-spacing:.12em; }
+.gut-welcome h2 { margin:10px 0; font-size:clamp(24px,2.5vw,34px); font-weight:750; letter-spacing:-.04em; line-height:1.15; }
+.gut-welcome p { max-width:560px; color:#5a7390; font-size:14px; line-height:1.65; }
+.gut-welcome-icon { display:grid; width:76px; height:76px; flex:0 0 76px; place-items:center; border:1px solid #d3e4fa; border-radius:24px; color:#3978c8; background:#fff; transform:rotate(-7deg); box-shadow:0 9px 20px #549af212; }
+.gut-quick-actions { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.gut-quick-actions > button { display:flex; align-items:center; gap:13px; padding:18px; border:1px solid #e0e7ef; border-radius:18px; color:#2c4665; background:white; text-align:left; transition:transform 150ms ease,box-shadow 150ms ease,border-color 150ms ease; }
+.gut-quick-actions > button:hover { transform:translateY(-2px); border-color:#abc8ec; box-shadow:0 7px 20px #263b540c; }
+.gut-quick-actions > button > span { display:grid; width:46px; height:46px; flex:0 0 46px; place-items:center; border-radius:14px; color:#367cc4; background:#eaf3ff; }
+.gut-quick-actions > button:last-child > span { color:#a66a45; background:#fff0e7; }
+.gut-quick-actions > button > div { display:grid; gap:5px; flex:1; }
+.gut-quick-actions b { font-size:15px; font-weight:700; }
+.gut-quick-actions small { color:#6c7f94; font-size:12px; }
+.gut-tabs { display:flex; gap:6px; width:fit-content; max-width:100%; padding:5px; border:1px solid #e6ecf2; border-radius:14px; background:#f0f4f8; }
+.gut-tabs button { display:flex; align-items:center; justify-content:center; gap:7px; padding:10px 18px; border:0; border-radius:10px; color:#61758c; background:transparent; font-size:13px; font-weight:650; }
+.gut-tabs button.active { color:#2a4c76; background:#fff; box-shadow:0 2px 6px #24364f0d; }
+.gut-tabs small { padding:1px 5px; border-radius:5px; background:#eaf1fa; font-size:10px; }
+.gut-notice { display:flex; align-items:center; gap:10px; padding:13px 15px; border:1px solid #d7e8df; border-radius:13px; color:#356e54; background:#f1f9f4; font-size:13px; line-height:1.5; }
+.gut-notice > svg { flex-shrink:0; }
+.gut-notice button { margin-left:auto; padding:4px; border:0; color:inherit; background:transparent; }
+.gut-composer, .gut-favorite-editor, .gut-patterns, .gut-favorites { display:grid; gap:20px; min-width:0; padding:24px; border:1px solid #e0e8f1; border-radius:22px; background:white; box-shadow:0 6px 22px #253c5806; animation:gut-enter 200ms ease both; }
+.gut-favorite-editor { scroll-margin-top:24px; border-color:#b5d1f4; background:#f9fbff; }
+.gut-section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.gut-section-head h3 { font-size:20px; font-weight:720; letter-spacing:-.025em; }
+.gut-section-head p { margin-top:5px; color:var(--gut-muted); font-size:13px; line-height:1.6; }
+.gut-section-head > span { color:var(--gut-muted); font-size:12px; }
+.gut-icon-button { display:inline-flex; min-width:32px; min-height:32px; align-items:center; justify-content:center; flex-shrink:0; padding:5px; border:0; border-radius:9px; color:#6c8097; background:transparent; }
+.gut-icon-button:hover { color:#3269a8; background:#edf3fb; }
+.gut-field { display:grid; gap:8px; min-width:0; color:#50667f; font-size:12px; font-weight:650; }
+.gut-field input, .gut-field select, .gut-field textarea, .gut-inline-form input { width:100%; min-width:0; padding:12px 13px; border:1px solid #dbe4ef; border-radius:11px; outline:none; color:#2b405a; background:#fff; font-size:14px; font-weight:450; }
+.gut-field input[type=datetime-local] { max-width:360px; }
+.gut-field textarea { min-height:78px; resize:vertical; }
+.gut-field input:focus, .gut-field textarea:focus, .gut-field select:focus, .gut-inline-form input:focus { border-color:#86afe4; box-shadow:0 0 0 3px #549af218; }
+.gut-chips, .gut-food-options { display:flex; flex-wrap:wrap; gap:8px; }
+.gut-chips button, .gut-food-options button { display:inline-flex; align-items:center; gap:7px; padding:10px 13px; border:1px solid #dbe5f0; border-radius:11px; color:#4b6481; background:#f9fbfe; font-size:13px; }
+.gut-chips button.selected { border-color:#b8cee9; color:#235e9d; background:#e7f1ff; box-shadow:inset 0 0 0 1px #d5e5f9; }
+.gut-food-options button:hover { color:#2e66a8; border-color:#9ec2ee; background:#eef5ff; }
+.gut-intensity, .gut-bristol { min-width:0; margin:0; padding:0; border:0; }
+.gut-intensity legend, .gut-bristol legend { margin-bottom:10px; color:#4e657e; font-size:13px; font-weight:650; }
+.gut-intensity button { min-height:40px; margin-right:8px; padding:8px 18px; border:1px solid #dee6ef; border-radius:10px; color:#61738a; background:#fff; font-size:13px; }
+.gut-intensity button.selected { color:#855736; border-color:#dfbfa4; background:#fff1e6; }
+.gut-bristol { padding:18px; border:1px solid #e9dfd4; border-radius:15px; background:#fffbf6; }
+.gut-bristol > p { color:#806c59; font-size:12px; line-height:1.6; margin-bottom:12px; }
+.gut-bristol > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+.gut-bristol button { display:flex; align-items:center; gap:10px; min-height:49px; padding:9px; border:1px solid #e9dfd2; border-radius:10px; color:#655649; background:white; text-align:left; font-size:12px; line-height:1.4; }
+.gut-bristol button b { display:grid; width:27px; height:27px; flex:0 0 27px; place-items:center; border-radius:8px; color:#8d6947; background:#f6eee2; }
+.gut-bristol button > span { flex:1; }
+.gut-bristol button.selected { border-color:#b59370; background:#fcf0dc; }
+.gut-bristol > a { display:inline-block; margin-top:13px; font-size:11px; }
+.gut-recent { display:grid; gap:10px; padding-bottom:20px; border-bottom:1px solid #e6edf5; }
+.gut-recent h4, .gut-food-picker h4 { font-size:14px; font-weight:700; }
+.gut-recent > p { color:var(--gut-muted); font-size:12px; line-height:1.6; }
+.gut-recent label { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #dfe8f2; border-radius:12px; background:#f8fbff; }
+.gut-recent label > span { display:grid; gap:5px; }
+.gut-recent label b { color:#365476; font-size:13px; font-weight:600; }
+.gut-recent label small { color:#74869c; font-size:11px; }
+.gut-diary input[type=checkbox] { width:17px; height:17px; flex-shrink:0; accent-color:#397fcf; }
+.gut-food-picker { display:grid; gap:14px; }
+.gut-search { display:flex; align-items:center; gap:10px; padding:0 13px; border:1px solid #dbe5f1; border-radius:13px; color:#8094ac; background:white; }
+.gut-search input { width:100%; min-width:0; min-height:46px; border:0; outline:none; color:#2c425e; background:transparent; font-size:14px; }
+.gut-search:focus-within { border-color:#8db4e5; box-shadow:0 0 0 3px #549af218; }
+.gut-category-strip { display:flex; gap:7px; overflow-x:auto; padding-bottom:3px; }
+.gut-category-strip button { flex-shrink:0; padding:7px 12px; border:1px solid #e0e7ef; border-radius:99px; color:#60758e; background:white; font-size:12px; }
+.gut-category-strip button.active { color:white; border-color:#314a68; background:#314a68; }
+.gut-search-actions { display:flex; flex-wrap:wrap; gap:12px; }
+.gut-search-actions button { display:inline-flex; align-items:center; gap:7px; max-width:100%; padding:8px 0; border:0; color:#326bb0; background:transparent; font-size:12px; overflow-wrap:anywhere; }
+.gut-hint { color:#7a899d; font-size:11px; line-height:1.6; }
+.gut-selected-foods { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.gut-selected-foods > article { display:grid; gap:12px; padding:15px; border:1px solid #dce8f7; border-radius:14px; background:#f6faff; }
+.gut-selected-foods > article > div { display:flex; align-items:center; gap:5px; }
+.gut-selected-foods b { flex:1; overflow-wrap:anywhere; font-size:14px; }
+.gut-selected-foods article > a { font-size:11px; }
+.gut-check-label { display:flex; align-items:flex-start; gap:9px; color:#576d86; font-size:12px; font-weight:450; line-height:1.6; }
+.gut-check-label input { margin-top:2px; }
+.gut-primary, .gut-secondary { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:45px; padding:10px 18px; border:0; border-radius:12px; color:white; background:#347acb; font-size:13px; font-weight:650; }
+.gut-primary { justify-self:start; box-shadow:0 5px 14px #347acb20; }
+.gut-primary:hover { background:#2c6ab5; }
+.gut-secondary { color:#326bb0; border:1px solid #d6e5f7; background:#eff6ff; }
+.gut-inline-form { display:flex; gap:8px; }
+.gut-inline-form input { flex:1; }
+.gut-inline-form button { display:inline-flex; align-items:center; gap:6px; padding:0 13px; border:1px solid #dbe6f3; border-radius:11px; color:#3e6fa7; background:#eef5ff; font-size:12px; }
+.gut-error { color:#a24646; font-size:13px; line-height:1.6; }
+.gut-history { display:grid; gap:16px; }
+.gut-history-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:12px; }
+.gut-history-card { display:grid; gap:11px; min-width:0; padding:18px; border:1px solid #e0e8f1; border-radius:17px; background:#fff; }
+.gut-history-card.is-symptom { border-color:#eddccb; background:#fffcf8; }
+.gut-history-card-top { display:flex; align-items:center; gap:8px; color:#78899d; font-size:11px; }
+.gut-history-card-top > span { display:inline-flex; align-items:center; gap:5px; margin-right:auto; color:#527397; font-size:11px; font-weight:650; }
+.gut-history-card.is-symptom .gut-history-card-top > span { color:#9c6a43; }
+.gut-history-card-top time { white-space:nowrap; }
+.gut-history-card h4 { overflow-wrap:anywhere; color:#304760; font-size:15px; font-weight:650; line-height:1.5; }
+.gut-history-card > p { color:#6e7f93; font-size:12px; line-height:1.65; }
+.gut-history-card .gut-linked-meals { padding-top:10px; border-top:1px solid #efe6db; color:#876f56; }
+.gut-outcome { justify-self:start; padding:5px 8px; border-radius:7px; color:#718095; background:#f0f4f8; font-size:11px; }
+.gut-outcome.well { color:#39755b; background:#ecf7f0; }
+.gut-outcome.symptoms { color:#94643b; background:#fff1e3; }
+.gut-meal-actions { display:flex; flex-wrap:wrap; gap:10px; padding-top:4px; }
+.gut-meal-actions button { display:inline-flex; align-items:center; gap:6px; min-height:33px; padding:6px 9px; border:1px solid #e0e8f0; border-radius:9px; color:#4c6c91; background:#f8fbff; font-size:11px; }
+.gut-empty { display:grid; gap:12px; justify-items:center; padding:35px 22px; border:1px dashed #d6e2f0; border-radius:17px; color:#5f88b5; background:#f9fcff; text-align:center; }
+.gut-empty h3 { color:#3b526d; font-size:17px; font-weight:650; }
+.gut-empty p { max-width:410px; color:#74859a; font-size:13px; line-height:1.7; }
+.gut-empty button { display:inline-flex; align-items:center; gap:7px; margin-top:4px; border:0; color:#3676be; background:transparent; font-size:13px; font-weight:650; }
+.gut-segment { display:flex; flex-wrap:wrap; gap:7px; }
+.gut-segment button { padding:9px 14px; border:1px solid #dce6f2; border-radius:10px; color:#627a95; background:#fff; font-size:12px; }
+.gut-segment button.selected { color:#326cb0; border-color:#b2cdef; background:#edf5ff; }
+.gut-analysis-explainer { padding:16px; border:1px solid #e0e8f1; border-radius:13px; background:#f7faff; }
+.gut-analysis-explainer b { color:#496582; font-size:13px; }
+.gut-analysis-explainer p { margin-top:7px; color:#6a7e96; font-size:12px; line-height:1.7; }
+.gut-pattern-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
+.gut-pattern { display:grid; gap:10px; min-width:0; padding:18px; border:1px solid #e0e7f0; border-radius:16px; background:white; }
+.gut-pattern > div:first-child { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+.gut-pattern h4 { overflow-wrap:anywhere; font-size:15px; font-weight:650; }
+.gut-frequency { padding:5px 7px; border-radius:7px; color:#687c95; background:#f0f4f8; font-size:10px; }
+.gut-frequency.frequent { color:#9a5050; background:#fcebed; }
+.gut-frequency.sometimes { color:#8c682e; background:#fdf2da; }
+.gut-frequency.rare { color:#3b785c; background:#ecf7ee; }
+.gut-pattern strong { font-size:31px; font-weight:740; letter-spacing:-.04em; }
+.gut-pattern strong small { color:#8392a4; font-size:18px; font-weight:550; }
+.gut-pattern p { color:#74849a; font-size:11px; line-height:1.65; }
+.gut-frequency-bar { overflow:hidden; height:5px; border-radius:99px; background:#eef2f7; }
+.gut-frequency-bar i { display:block; height:100%; border-radius:inherit; background:#7ba7d8; transition:width 300ms ease; }
+.gut-pattern footer { display:flex; flex-wrap:wrap; justify-content:space-between; gap:7px; color:#8190a3; font-size:10px; }
+.gut-medical-note { padding-top:12px; border-top:1px solid #e5ebf2; color:#7b8b9e; font-size:12px; line-height:1.7; }
+.gut-favorite-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.gut-favorite-grid article { display:flex; min-width:0; flex-direction:column; align-items:flex-start; gap:10px; padding:18px; border:1px solid #e1e8f2; border-radius:16px; background:#fafdff; }
+.gut-favorite-grid article > svg { color:#b79543; }
+.gut-favorite-grid h4 { overflow-wrap:anywhere; font-size:15px; font-weight:650; }
+.gut-favorite-grid p { color:#7b8b9e; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+.gut-favorite-grid small { color:#56789c; background:#edf4fd; border-radius:6px; padding:4px 7px; font-size:10px; }
+.gut-favorite-grid article > div { display:flex; flex-wrap:wrap; gap:9px; margin-top:auto; padding-top:8px; }
+.gut-favorite-grid button { display:inline-flex; align-items:center; gap:4px; min-height:32px; border:0; color:#4674a9; background:transparent; font-size:11px; }
+.gut-text-button { justify-self:start; padding:4px 0; border:0; color:#a56767; background:transparent; font-size:11px; }
+@keyframes gut-enter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+@media (max-width:800px) { .gut-favorite-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:600px) {
+ .gut-diary { gap:15px; padding:0 12px 18px; }
+ .gut-welcome { padding:20px; border-radius:19px; }
+ .gut-welcome h2 { font-size:24px; }
+ .gut-welcome p { font-size:12px; }
+ .gut-welcome-icon { display:none; }
+ .gut-quick-actions { gap:9px; }
+ .gut-quick-actions > button { align-items:flex-start; flex-wrap:wrap; gap:10px; padding:13px; border-radius:15px; }
+ .gut-quick-actions > button > div { flex-basis:100%; }
+ .gut-quick-actions > button > svg { display:none; }
+ .gut-quick-actions > button > span { width:37px; height:37px; flex-basis:37px; border-radius:11px; }
+ .gut-quick-actions b { font-size:14px; }
+ .gut-quick-actions small { font-size:11px; line-height:1.5; }
+ .gut-tabs { width:100%; }
+ .gut-tabs button { flex:1; padding:9px 7px; font-size:12px; }
+ .gut-composer, .gut-favorite-editor, .gut-patterns, .gut-favorites { gap:17px; padding:16px; border-radius:17px; }
+ .gut-section-head h3 { font-size:18px; }
+ .gut-section-head > span { font-size:10px; }
+ .gut-selected-foods, .gut-history-grid, .gut-pattern-grid, .gut-favorite-grid { grid-template-columns:minmax(0,1fr); }
+ .gut-bristol { padding:12px; }
+ .gut-bristol > div { grid-template-columns:minmax(0,1fr); }
+ .gut-field input, .gut-field textarea, .gut-field select, .gut-inline-form input, .gut-search input { font-size:16px; }
+ .gut-field input[type=datetime-local] { width:100%; max-width:100%; }
+ .gut-intensity button { padding:8px 12px; margin-right:5px; font-size:12px; }
+ .gut-history-card { padding:15px; }
+ .gut-primary { width:100%; }
+ .gut-inline-form { flex-wrap:wrap; }
+ .gut-inline-form input { flex-basis:100%; }
+ .gut-inline-form button { min-height:38px; }
+}
+@media (prefers-reduced-motion:reduce) { .gut-diary *, .gut-diary *::before, .gut-diary *::after { animation:none !important; transition:none !important; } }
