@@ -738,6 +738,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .project-color-picker { display: flex; flex-wrap: wrap; gap: 10px; }
 .project-color-picker button { display: grid; width: 36px; height: 36px; place-items: center; border: 3px solid white; border-radius: 50%; color: white; box-shadow: 0 0 0 1px #e0e6ef; transition: transform 150ms ease, box-shadow 150ms ease; }
 .project-color-picker button[aria-checked=true] { transform: scale(1.08); box-shadow: 0 0 0 2px #30465f; }
+.project-custom-color { display:flex; align-items:stretch; gap:12px; margin-top:5px; }
+.project-custom-color-swatch { display:flex; align-items:center; gap:9px; padding:9px 12px; border:1px solid #dce4ee; border-radius:12px; color:#445c78; background:#f8fbff; font-size:12px; cursor:pointer; }
+.project-custom-color-swatch input { width:36px; height:36px; padding:2px; border:1px solid #cbd6e5; border-radius:9px; background:white; cursor:pointer; }
+.project-custom-color-hex { display:grid; flex:1; min-width:0; gap:5px; color:#536981; font-size:11px; }
+.project-custom-color-hex input { width:100%; min-width:0; min-height:36px; padding:7px 10px; border:1px solid #dce4ee; border-radius:9px; color:#304660; background:white; font-size:16px; font-family:monospace; outline:none; }
+.project-custom-color-hex input:focus { border-color:#76a7e4; box-shadow:0 0 0 3px #549af21c; }
+.project-custom-color-hex input[aria-invalid=true] { border-color:#c77575; }
+.project-editor > .project-color-error { color:#a94343; }
 .project-editor > p { margin: 0; color: #8491a1; font-size: 11px; line-height: 1.5; }
 .project-save-button { min-height: 48px; margin-top: 8px; border: 0; border-radius: 13px; color: #fff; background: #24364f; font-size: 13px; font-weight: 700; }
 .project-save-button:disabled { opacity: .42; }

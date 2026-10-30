@@ -5073,6 +5073,8 @@ function ProjectsTab({ data, setData, onOpenProjectTasks, onAddTask }: { data: A
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [color, setColor] = useState("#549AF2");
+  const isProjectColorValid = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color);
+  const resolvedProjectColor = isProjectColorValid ? (color.length === 4 ? `#${color.slice(1).split("").map(char => char + char).join("")}` : color).toUpperCase() : "#549AF2";
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [sectionDraft, setSectionDraft] = useState("");
@@ -5109,9 +5111,9 @@ function ProjectsTab({ data, setData, onOpenProjectTasks, onAddTask }: { data: A
   const openEditor = (project?: Project) => { setEditingId(project?.id ?? null); setName(project?.name ?? ""); setColor(project?.color ?? colors[0]); setEditorOpen(true); };
   const saveProject = () => {
     const clean = name.trim();
-    if (!clean) return;
-    if (editingId) setData(prev => ({ ...prev, projects: prev.projects.map(project => project.id === editingId ? { ...project, name: clean, color, updatedAt: new Date().toISOString() } : project) }));
-    else setData(prev => ({ ...prev, projects: [...prev.projects, { id: uid(), name: clean, color, createdAt: getDateKey(), updatedAt: new Date().toISOString(), sections: [] }] }));
+    if (!clean || !isProjectColorValid) return;
+    if (editingId) setData(prev => ({ ...prev, projects: prev.projects.map(project => project.id === editingId ? { ...project, name: clean, color: resolvedProjectColor, updatedAt: new Date().toISOString() } : project) }));
+    else setData(prev => ({ ...prev, projects: [...prev.projects, { id: uid(), name: clean, color: resolvedProjectColor, createdAt: getDateKey(), updatedAt: new Date().toISOString(), sections: [] }] }));
     setEditorOpen(false);
   };
   const deleteProject = (project: Project) => {
@@ -5185,7 +5187,7 @@ function ProjectsTab({ data, setData, onOpenProjectTasks, onAddTask }: { data: A
       </div>
     </main>}
     <BottomSheet open={editorOpen} onClose={() => setEditorOpen(false)} title={editingId ? "Изменить проект" : "Новый проект"}>
-      <div className="project-editor"><label htmlFor="project-name">Название проекта</label><input id="project-name" autoFocus value={name} maxLength={56} onChange={event => setName(event.target.value)} placeholder="Например, сайт для тюбинга" /><div className="project-color-heading"><span>Цвет проекта</span><b>{color}</b></div><div className="project-color-picker" role="radiogroup" aria-label="Цвет проекта">{colors.map(value => <button key={value} type="button" role="radio" aria-checked={color === value} aria-label={`Выбрать цвет ${value}`} style={{ backgroundColor: value }} onClick={() => setColor(value)}>{color === value && <Check size={16} />}</button>)}</div><p>Цвет поможет сразу узнавать задачи этого проекта в списке.</p><button className="project-save-button" type="button" disabled={!name.trim()} onClick={saveProject}>{editingId ? "Сохранить проект" : "Создать проект"}</button></div>
+      <div className="project-editor"><label htmlFor="project-name">Название проекта</label><input id="project-name" autoFocus value={name} maxLength={56} onChange={event => setName(event.target.value)} placeholder="Например, сайт для тюбинга" /><div className="project-color-heading"><span>Цвет проекта</span><b>{color}</b></div><div className="project-color-picker" role="radiogroup" aria-label="Цвет проекта">{colors.map(value => <button key={value} type="button" role="radio" aria-checked={color === value} aria-label={`Выбрать цвет ${value}`} style={{ backgroundColor: value }} onClick={() => setColor(value)}>{color === value && <Check size={16} />}</button>)}</div><div className="project-custom-color"><label className="project-custom-color-swatch"><input type="color" aria-label="Выбрать любой цвет проекта" value={resolvedProjectColor} onChange={event => setColor(event.target.value.toUpperCase())} /><span>Палитра</span></label><label className="project-custom-color-hex" htmlFor="project-color-hex"><span>Свой цвет · HEX</span><input id="project-color-hex" value={color} maxLength={7} spellCheck={false} autoComplete="off" aria-invalid={!isProjectColorValid} aria-describedby={!isProjectColorValid ? "project-color-error" : undefined} onChange={event => setColor(event.target.value.trim().toUpperCase())} placeholder="#549AF2" /></label></div>{!isProjectColorValid && <p id="project-color-error" className="project-color-error" role="alert">Укажи цвет в формате #549AF2 или #ABC.</p>}<p>Нажми на палитру для выбора любого оттенка или введи его HEX-код.</p><button className="project-save-button" type="button" disabled={!name.trim() || !isProjectColorValid} onClick={saveProject}>{editingId ? "Сохранить проект" : "Создать проект"}</button></div>
     </BottomSheet>
   </div>;
 }
