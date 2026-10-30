@@ -2669,8 +2669,8 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
             </div>
             <div className="goals-date-actions">
               {selectedDate !== todayKey && <button type="button" className="goals-today-button" onClick={goToToday}>Сегодня</button>}
-              <button type="button" className="goals-date-nav" aria-label="Предыдущая неделя" onClick={() => changeSelectedDate(-7)}><ChevronLeft size={17} /></button>
-              <button type="button" className="goals-date-nav" aria-label="Следующая неделя" onClick={() => changeSelectedDate(7)}><ChevronRight size={17} /></button>
+              <button type="button" className="goals-date-nav" aria-label="Предыдущий день" title="Предыдущий день" onClick={() => changeSelectedDate(-1)}><ChevronLeft size={17} /></button>
+              <button type="button" className="goals-date-nav" aria-label="Следующий день" title="Следующий день" onClick={() => changeSelectedDate(1)}><ChevronRight size={17} /></button>
               <button type="button" className="goals-date-picker-button" aria-label="Выбрать дату" onClick={openDatePicker}><CalendarDays size={16} /><span>Дата</span></button>
             </div>
           </div>
