@@ -8,12 +8,18 @@ type Goal = {
   deadline?: string | null;
   time?: string | null;
   createdAt?: string | null;
+  icon?: string;
+  priority?: "high" | "medium" | "low";
   recurring?: string;
   recurrenceSeriesId?: string;
   recurrenceEndDate?: string | null;
   recurrenceSkippedDates?: string[];
   recurrenceState?: Record<string, { completed?: boolean; missed?: boolean; missedStreak?: number }>;
   subtasks?: { id: string; title?: string; done?: boolean }[];
+  nextStepTitle?: string;
+  continuationFromId?: string;
+  continuationFromTitle?: string;
+  continuationGoalId?: string;
   completed?: boolean;
   archived?: boolean;
 };
@@ -319,6 +325,34 @@ async function handleCallback(update: TelegramUpdate, supabase: ReturnType<typeo
         } else {
           goal.completed = true;
           goal.completedAt = timestamp;
+        }
+        const nextTitle = goal.nextStepTitle?.trim();
+        const existingContinuation = (snapshot.goals ?? []).some(item =>
+          item.continuationFromId === goal.id || item.id === goal.continuationGoalId,
+        );
+        if (nextTitle && !existingContinuation) {
+          const continuationId = crypto.randomUUID();
+          const group = goal.group ?? "today";
+          goal.continuationGoalId = continuationId;
+          snapshot.goals = [...(snapshot.goals ?? []), {
+            id: continuationId,
+            title: nextTitle,
+            icon: goal.icon ?? "target",
+            description: "",
+            createdAt: date,
+            deadline: null,
+            time: null,
+            priority: goal.priority ?? "medium",
+            group,
+            scheduledFor: group === "longterm" ? null : date,
+            subtasks: [],
+            completed: false,
+            completedAt: null,
+            recurring: "none",
+            archived: false,
+            continuationFromId: goal.id,
+            continuationFromTitle: goal.title ?? "",
+          }];
         }
         const { error } = await supabase.from("users").update({ data: snapshot }).eq("telegram_id", chatId);
         if (error) throw error;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { AreaChart, Area, Bar, BarChart, CartesianGrid, Cell, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { ArrowUpRight, BarChart3, Bike, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Dumbbell, Flame, Heart, House, MoreHorizontal, Pencil, Pill as PillIcon, Plus, ShoppingBag, Sparkles, Target, Trash2, TrendingUp, Undo2, Utensils, X, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BarChart3, Bike, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Dumbbell, Flame, Heart, House, MoreHorizontal, Pencil, Pill as PillIcon, Plus, ShoppingBag, Sparkles, Target, Trash2, TrendingUp, Undo2, Utensils, X, type LucideIcon } from "lucide-react";
 import { Slider } from "./components/ui/slider";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "./components/ui/chart";
 import { supabase } from "../lib/supabase";
@@ -109,6 +109,10 @@ interface Goal {
   recurrencePattern?: RecurringType;
   recurrenceEndDate?: string | null;
   recurrenceSkippedDates?: string[];
+  nextStepTitle?: string;
+  continuationFromId?: string;
+  continuationFromTitle?: string;
+  continuationGoalId?: string;
 }
 
 interface FoodItem {
@@ -377,6 +381,46 @@ function isGoalCompletedForDate(goal: Goal, dateKey: string): boolean {
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10);
+}
+
+function appendContinuation(goals: Goal[], parentId: string, date: string, continuationId: string): Goal[] {
+  const parent = goals.find(goal => goal.id === parentId);
+  const nextTitle = parent?.nextStepTitle?.trim();
+  if (!parent || !nextTitle) return goals;
+
+  const linkedGoal = goals.find(goal => goal.id === parent.continuationGoalId || goal.continuationFromId === parent.id);
+  if (linkedGoal) return goals;
+
+  const continuation: Goal = {
+    id: continuationId,
+    title: nextTitle,
+    icon: parent.icon ?? "target",
+    description: "",
+    createdAt: date,
+    deadline: null,
+    time: null,
+    priority: parent.priority,
+    group: parent.group,
+    scheduledFor: parent.group === "longterm" ? null : date,
+    subtasks: [],
+    completed: false,
+    completedAt: null,
+    recurring: "none",
+    archived: false,
+    continuationFromId: parent.id,
+    continuationFromTitle: parent.title,
+  };
+  return goals.map(goal => goal.id === parent.id ? { ...goal, continuationGoalId: continuationId } : goal).concat(continuation);
+}
+
+function removePendingContinuation(goals: Goal[], parentId: string): Goal[] {
+  const parent = goals.find(goal => goal.id === parentId);
+  if (!parent) return goals;
+  const child = goals.find(goal => goal.id === parent.continuationGoalId || goal.continuationFromId === parentId);
+  if (!child || child.completed || child.subtasks.some(step => step.done)) return goals;
+  return goals.filter(goal => goal.id !== child.id).map(goal => goal.id === parentId
+    ? { ...goal, continuationGoalId: undefined }
+    : goal);
 }
 
 function buildRecurringGoalSeries(baseGoal: Goal): Goal[] {
@@ -1328,11 +1372,16 @@ function HomeTab({
   }, 0);
 
   const handleCompleteGoal = (id: string) => {
-    setData(prev => ({
-      ...prev,
-      goals: prev.goals.map(g => {
+    const continuationId = uid();
+    setData(prev => {
+      const completedGoals = prev.goals.map(g => {
         if (g.id !== id) return g;
-        if (g.recurring === "none") return { ...g, completed: true, completedAt: new Date().toISOString() };
+        if (g.recurring === "none") return {
+          ...g,
+          completed: true,
+          completedAt: new Date().toISOString(),
+          subtasks: g.subtasks.map(step => ({ ...step, done: true })),
+        };
         return {
           ...g,
           recurrenceState: {
@@ -1340,8 +1389,9 @@ function HomeTab({
             [todayKey]: { ...getGoalRecurrenceState(g, todayKey), completed: true, missed: false, missedStreak: 0 },
           },
         };
-      }),
-    }));
+      });
+      return { ...prev, goals: appendContinuation(completedGoals, id, todayKey, continuationId) };
+    });
   };
 
   const handleMedicationDose = (medicationId: string, time: string) => {
@@ -1552,6 +1602,8 @@ function HomeTab({
                     <div className="dashboard-goal-meta">
                       <span className="dashboard-priority-tag"><i style={{ background: PRIORITY_COLORS[goal.priority] }} />{PRIORITY_LABELS[goal.priority]} приоритет</span>
                       {goal.subtasks.length > 0 && <span>{goal.subtasks.filter(task => task.done).length} из {goal.subtasks.length} подзадач</span>}
+                      {goal.continuationFromTitle && <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF3FF] px-2 py-0.5 text-[10px] font-semibold text-[#285EA4]"><ArrowRight size={11} />Продолжение</span>}
+                      {goal.nextStepTitle && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#526174]"><ArrowRight size={11} />Дальше: {goal.nextStepTitle}</span>}
                     </div>
                     {goal.subtasks.length > 0 && <div className="dashboard-goal-progress-track"><i style={{ width: `${calcGoalProgress(goal)}%` }} /></div>}
                   </div>
@@ -2071,11 +2123,14 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   const undoCompletion = () => {
     if (!completionNotice) return;
     const { goal, date } = completionNotice;
-    setData(prev => ({ ...prev, goals: prev.goals.map(item => item.id !== goal.id ? item : {
-      ...item, completed: goal.completed, completedAt: goal.completedAt,
-      subtasks: item.subtasks.map(step => ({ ...step, done: goal.subtasks.find(old => old.id === step.id)?.done ?? step.done })),
-      recurrenceState: { ...item.recurrenceState, [date]: goal.recurrenceState?.[date] ?? { completed: false, missed: false, missedStreak: 0 } },
-    }) }));
+    setData(prev => {
+      const restoredGoals = prev.goals.map(item => item.id !== goal.id ? item : {
+        ...item, completed: goal.completed, completedAt: goal.completedAt,
+        subtasks: item.subtasks.map(step => ({ ...step, done: goal.subtasks.find(old => old.id === step.id)?.done ?? step.done })),
+        recurrenceState: { ...item.recurrenceState, [date]: goal.recurrenceState?.[date] ?? { completed: false, missed: false, missedStreak: 0 } },
+      });
+      return { ...prev, goals: removePendingContinuation(restoredGoals, goal.id) };
+    });
     setCompletionNotice(null);
   };
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
@@ -2129,7 +2184,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
   }, [todayKey, setData]);
 
   const newGoal = (): Partial<Goal> => ({
-    title: "", icon: "target", description: "", deadline: null, time: null, priority: "medium", group: group === "all" ? "today" : group, scheduledFor: selectedDate, subtasks: [], recurring: "none",
+    title: "", icon: "target", description: "", deadline: null, time: null, priority: "medium", group: group === "all" ? "today" : group, scheduledFor: selectedDate, subtasks: [], recurring: "none", nextStepTitle: "",
   });
   const [draft, setDraft] = useState<Partial<Goal>>(newGoal());
   const [newSubtask, setNewSubtask] = useState("");
@@ -2253,9 +2308,9 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
 
   const handleComplete = (id: string) => {
     celebrateCompletion(id);
-    setData(prev => ({
-      ...prev,
-      goals: prev.goals.map(g => {
+    const continuationId = uid();
+    setData(prev => {
+      const completedGoals = prev.goals.map(g => {
         if (g.id !== id) return g;
 
         return {
@@ -2272,8 +2327,9 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
             },
           },
         };
-      }),
-    }));
+      });
+      return { ...prev, goals: appendContinuation(completedGoals, id, selectedDate, continuationId) };
+    });
   };
 
   const handleCompleteFromEditor = () => {
@@ -2284,9 +2340,8 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
 
   const handleUncomplete = (id: string) => {
     setCompletionNotice(null);
-    setData(prev => ({
-      ...prev,
-      goals: prev.goals.map(g => {
+    setData(prev => {
+      const restoredGoals = prev.goals.map(g => {
         if (g.id !== id) return g;
 
         return {
@@ -2303,8 +2358,9 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
             },
           },
         };
-      }),
-    }));
+      });
+      return { ...prev, goals: removePendingContinuation(restoredGoals, id) };
+    });
   };
 
   const handleDelete = (id: string, mode: "single" | "series" = "single") => {
@@ -2370,10 +2426,11 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
     const step = goal?.subtasks.find(item => item.id === subId);
     if (!goal || !step) return;
     if (step.done) setCompletionNotice(null);
-    if (!step.done && goal.subtasks.every(item => item.id === subId || item.done)) celebrateCompletion(goalId);
-    setData(prev => ({
-      ...prev,
-      goals: prev.goals.map(g => {
+    const completesNow = !step.done && goal.subtasks.every(item => item.id === subId || item.done);
+    if (completesNow) celebrateCompletion(goalId);
+    const continuationId = uid();
+    setData(prev => {
+      const updatedGoals = prev.goals.map(g => {
         if (g.id !== goalId || !g.subtasks.some(s => s.id === subId)) return g;
         const updatedSubtasks = g.subtasks.map(s => s.id === subId ? { ...s, done: !s.done } : s);
         const allDone = updatedSubtasks.length > 0 && updatedSubtasks.every(s => s.done);
@@ -2391,8 +2448,17 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
             },
           },
         };
-      }),
-    }));
+      });
+      const nextGoals = completesNow
+        ? appendContinuation(updatedGoals, goalId, selectedDate, continuationId)
+        : step.done
+          ? removePendingContinuation(updatedGoals, goalId)
+          : updatedGoals;
+      return {
+        ...prev,
+        goals: nextGoals,
+      };
+    });
   };
 
   const openGoalEditor = (goal?: Goal) => {
@@ -2449,6 +2515,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
                 scheduledFor: draft.scheduledFor ?? g.scheduledFor ?? selectedDate,
                 subtasks: draft.subtasks ?? g.subtasks,
                 recurring: draft.recurring ?? g.recurring,
+                nextStepTitle: draft.nextStepTitle?.trim() || undefined,
               }
             : g
         ),
@@ -2470,6 +2537,7 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
         completedAt: null,
         recurring: draft.recurring ?? "none",
         archived: false,
+        nextStepTitle: draft.nextStepTitle?.trim() || undefined,
       };
 
       const goalsToAdd = (draft.recurring ?? "none") === "daily" || (draft.recurring ?? "none") === "weekly"
@@ -2838,6 +2906,21 @@ function GoalsTab({ data, setData }: { data: AppData; setData: (fn: (p: AppData)
               <button type="button" disabled={!newSubtask.trim()} onClick={addDraftSubtask} aria-label="Добавить шаг" className="goal-add-step-button">
                 <Plus size={18} /><span>Добавить шаг</span>
               </button>
+            </div>
+          </section>
+
+          <section className="goal-editor-section">
+            <div className="goal-editor-section-heading"><span className="goal-editor-step">7</span><div><h3>Следующий шаг</h3><p>Он появится, когда эта задача будет выполнена</p></div></div>
+            <div className="goal-editor-field">
+              <label htmlFor="goal-next-step-input">Что нужно сделать дальше? <span>· необязательно</span></label>
+              <input
+                id="goal-next-step-input"
+                className="goal-editor-input"
+                placeholder="Например, донести продукты до дома"
+                value={draft.nextStepTitle ?? ""}
+                onChange={e => setDraft(d => ({ ...d, nextStepTitle: e.target.value }))}
+              />
+              <p className="mt-1.5 text-xs leading-relaxed text-[#64748B]">После отметки «Выполнено» следующая задача добавится в этот же список.</p>
             </div>
           </section>
 
@@ -3537,6 +3620,8 @@ function GoalCard({
             </span>
             <span className="goal-priority-chip" style={{ "--goal-priority": priorityColor, "--goal-priority-ink": overdue ? "#A33737" : PRIORITY_INK[goal.priority] } as React.CSSProperties}><i />{PRIORITY_LABELS[goal.priority]} приоритет</span>
             <span className="goal-group-chip">{GROUP_LABELS[goal.group]}</span>
+            {goal.continuationFromTitle && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${isCompleted ? "border-white/30 bg-white/15 text-white" : "border-[#C8DDF8] bg-[#EAF3FF] text-[#285EA4]"}`}><ArrowRight size={12} />Продолжение: {goal.continuationFromTitle}</span>}
+            {goal.nextStepTitle && <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${isCompleted ? "border-white/30 bg-white/15 text-white" : "border-[#D9E2EE] bg-white text-[#526174]"}`}><ArrowRight size={12} />Дальше: {goal.nextStepTitle}</span>}
             {dueLabel && <span className={`goal-meta-detail ${overdue && !isCompleted ? "is-overdue" : ""}`}><CalendarDays size={13} />До {dueLabel}</span>}
             {recurrenceLabel && <span className="goal-meta-detail"><Clock3 size={13} />{recurrenceLabel}</span>}
             {isCompleted && completedDateLabel && <span className="goal-meta-detail goal-completed-date"><Check size={13} />{completedDateLabel}</span>}
