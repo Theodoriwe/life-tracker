@@ -5078,6 +5078,13 @@ function ProjectsTab({ data, setData, onOpenProjectTasks, onAddTask }: { data: A
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [sectionDraft, setSectionDraft] = useState("");
+  const [projectToday, setProjectToday] = useState(getDateKey);
+  useEffect(() => {
+    const updateDay = () => setProjectToday(getDateKey());
+    const interval = window.setInterval(updateDay, 60000);
+    window.addEventListener("focus", updateDay);
+    return () => { window.clearInterval(interval); window.removeEventListener("focus", updateDay); };
+  }, []);
   const [taskSearch, setTaskSearch] = useState("");
   const toggleProjectTask = (task: Goal) => {
     const continuationId = uid();
@@ -5093,14 +5100,17 @@ function ProjectsTab({ data, setData, onOpenProjectTasks, onAddTask }: { data: A
   };
   const colors = ["#549AF2", "#8B6FE8", "#36A88A", "#E49A43", "#E16F83", "#536A8D", "#61A6B8", "#718A41"];
   const activeProjects = data.projects.map(project => {
-    const tasks = data.goals.filter(goal => goal.projectId === project.id && !goal.archived);
+    const allProjectTasks = data.goals.filter(goal => goal.projectId === project.id);
+    const tasks = allProjectTasks.filter(goal => !goal.archived);
     const done = tasks.filter(goal => goal.completed).length;
-    const dates = [...tasks.flatMap(goal => [goal.progressUpdatedAt, goal.completedAt, goal.createdAt]), project.updatedAt, ...(project.sections ?? []).map(section => section.createdAt)].filter(Boolean) as string[];
-    dates.sort();
-    const lastDate = dates[dates.length - 1] ?? project.createdAt;
-    const lastDay = getDateKey(new Date(lastDate.length === 10 ? `${lastDate}T12:00:00` : lastDate));
-    const inactivity = Math.max(0, Math.floor((new Date(`${getDateKey()}T12:00:00`).getTime() - new Date(`${lastDay}T12:00:00`).getTime()) / 86400000));
-    return { project, tasks, done, lastDay, inactivity };
+    const dates = [project.createdAt, ...allProjectTasks.flatMap(goal => [goal.progressUpdatedAt, goal.completedAt, goal.createdAt])]
+      .filter((value): value is string => !!value)
+      .map(value => new Date(value.length === 10 ? `${value}T12:00:00` : value))
+      .filter(value => Number.isFinite(value.getTime()))
+      .map(value => getDateKey(value)).filter(value => value <= projectToday).sort();
+    const lastDay = dates[dates.length - 1] ?? projectToday;
+    const inactivity = Math.max(0, Math.round((Date.parse(`${projectToday}T00:00:00Z`) - Date.parse(`${lastDay}T00:00:00Z`)) / 86400000));
+    return { project, tasks, done, lastDay, inactivity, hasTaskHistory: allProjectTasks.length > 0 };
   }).sort((a, b) => b.inactivity - a.inactivity);
   const selectedProject = data.projects.find(project => project.id === selectedProjectId) ?? null;
   const selectedProjectTasks = selectedProject ? data.goals.filter(goal => goal.projectId === selectedProject.id && !goal.archived) : [];
@@ -5133,7 +5143,7 @@ function ProjectsTab({ data, setData, onOpenProjectTasks, onAddTask }: { data: A
     if (!window.confirm(`Удалить раздел «${section.name}»? Его задачи останутся в проекте без раздела.`)) return;
     setData(prev => ({ ...prev, projects: prev.projects.map(project => project.id === projectId ? { ...project, updatedAt: new Date().toISOString(), sections: (project.sections ?? []).filter(item => item.id !== section.id) } : project), goals: prev.goals.map(goal => goal.projectSectionId === section.id ? { ...goal, projectSectionId: null } : goal) }));
   };
-  const dayWord = (count: number) => count === 1 ? "день" : count >= 2 && count <= 4 ? "дня" : "дней";
+  const dayWord = (count: number) => count % 100 >= 11 && count % 100 <= 14 ? "дней" : count % 10 === 1 ? "день" : count % 10 >= 2 && count % 10 <= 4 ? "дня" : "дней";
   return <div className="app-page projects-page pt-14 pb-8">
     {!selectedProject && <>
     <header className="projects-header"><div><p className="projects-eyebrow"><FolderKanban size={16} />ПРОЕКТЫ И ИДЕИ</p><h1>Проекты</h1><p>Держи важные дела в поле зрения и возвращайся к ним маленькими шагами.</p></div><button type="button" className="projects-create-button" onClick={() => openEditor()}><Plus size={17} />Новый проект</button></header>
@@ -5142,7 +5152,7 @@ function ProjectsTab({ data, setData, onOpenProjectTasks, onAddTask }: { data: A
       <div><span>Активные задачи</span><strong>{activeProjects.reduce((sum, item) => sum + item.tasks.filter(task => !task.completed).length, 0)}</strong><small>можно продолжить</small></div>
       <div><span>Уже завершено</span><strong>{activeProjects.reduce((sum, item) => sum + item.done, 0)}</strong><small>задач по проектам</small></div>
     </section>
-    {activeProjects.length ? <div className="projects-grid">{activeProjects.map(({ project, tasks, done, lastDay, inactivity }) => {
+    {activeProjects.length ? <div className="projects-grid">{activeProjects.map(({ project, tasks, done, lastDay, inactivity, hasTaskHistory }) => {
       const expanded = expandedId === project.id;
       const activeTasks = tasks.filter(task => !task.completed);
       const completedTasks = tasks.filter(task => task.completed);
@@ -5151,7 +5161,7 @@ function ProjectsTab({ data, setData, onOpenProjectTasks, onAddTask }: { data: A
         <div className="project-card-top"><button type="button" className="project-card-summary-open" onClick={() => setSelectedProjectId(project.id)}><span className="project-card-icon"><FolderKanban size={21} /></span><span><b>{project.name}</b><small>Открыть сводку проекта <ArrowUpRight size={12} /></small></span></button><div className="project-card-actions"><button type="button" aria-label={`Изменить проект ${project.name}`} onClick={() => openEditor(project)}><Pencil size={15} /></button><button type="button" aria-label={`Удалить проект ${project.name}`} onClick={() => deleteProject(project)}><Trash2 size={15} /></button></div></div>
         <div className="project-card-stats"><span><b>{activeTasks.length}</b> в работе</span><span><b>{done}</b> готово</span><span><b>{(project.sections ?? []).length}</b> разделов</span></div>
         <div className="project-card-progress"><div><span>Общий прогресс</span><b>{projectProgress}%</b></div><i><em style={{ width: `${projectProgress}%` }} /></i></div>
-        <div className={`project-activity ${inactivity >= 7 ? "needs-attention" : ""}`}><span className="project-activity-dot" /><span>{tasks.length === 0 ? "Добавь первую задачу" : inactivity === 0 ? "Была активность сегодня" : `Без движения ${inactivity} ${dayWord(inactivity)}`}</span><small>{tasks.length ? `последний шаг · ${formatGoalDate(lastDay)}` : "проект ждёт начала"}</small></div>
+        <div className={`project-activity ${inactivity > 0 ? "needs-attention" : ""} ${inactivity >= 7 ? "is-overdue" : ""}`}><span className="project-activity-dot" /><span>Без продвижения</span><strong>{inactivity}<em>{dayWord(inactivity)}</em></strong><small>{hasTaskHistory ? `${inactivity === 0 ? "Был шаг сегодня" : "Последний шаг"} · ${formatGoalDate(lastDay)}` : `С создания проекта · ${formatGoalDate(lastDay)}`}</small></div>
         <button type="button" className="project-tasks-toggle" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : project.id)}><span>{tasks.length ? `Показать задачи · ${tasks.length}` : "Пока нет задач"}</span><ChevronDown size={16} /></button>
         {expanded && <div className="project-task-list">{activeTasks.length ? activeTasks.map(task => <div className="project-task-row" key={task.id}><span className="project-task-state" /><span>{task.projectSectionId && <small>{project.sections?.find(section => section.id === task.projectSectionId)?.name} · </small>}{task.title}</span>{task.isLargeTask && <b>{calcGoalProgress(task)}%</b>}</div>) : tasks.length ? <p className="project-no-tasks">Все задачи завершены — отличная работа!</p> : <p className="project-no-tasks">Добавь первую задачу к проекту во вкладке «Задачи».</p>}{completedTasks.length > 0 && <><p className="project-completed-count"><Check size={13} />Уже сделано · {completedTasks.length}</p>{completedTasks.map(task => <div className="project-task-row is-completed" key={task.id}><span className="project-task-state"><Check size={9} /></span><span>{task.projectSectionId && <small>{project.sections?.find(section => section.id === task.projectSectionId)?.name} · </small>}{task.title}</span></div>)}</>}<button type="button" className="project-open-tasks" onClick={() => onOpenProjectTasks(project.id)}>Задачи этого проекта <ArrowRight size={14} /></button></div>}
       </article>;
@@ -5164,7 +5174,7 @@ function ProjectsTab({ data, setData, onOpenProjectTasks, onAddTask }: { data: A
         <section className="project-dashboard-hero" style={{ "--project-color": selectedProject.color } as React.CSSProperties}>
           <div className="project-dashboard-title"><span className="project-dashboard-icon"><FolderKanban size={22} /></span><div><small>ПРОГРЕСС И СТАТИСТИКА</small><h2>Сводка проекта</h2></div></div>
           <div className="project-dashboard-progress"><div><span>Общий прогресс</span><b>{selectedProjectProgress}%</b></div><i><em style={{ width: `${selectedProjectProgress}%` }} /></i></div>
-          <div className="project-dashboard-metrics"><div><b>{selectedProjectTasks.length}</b><span>всего задач</span></div><div><b>{selectedProjectActiveTasks.length}</b><span>в работе</span></div><div><b>{selectedProjectCompletedTasks.length}</b><span>выполнено</span></div><div><b>{selectedProjectIdleDays}</b><span>дней без дела</span></div></div>
+          <div className="project-dashboard-metrics"><div><b>{selectedProjectTasks.length}</b><span>всего задач</span></div><div><b>{selectedProjectActiveTasks.length}</b><span>в работе</span></div><div><b>{selectedProjectCompletedTasks.length}</b><span>выполнено</span></div><div className={`project-idle-metric ${selectedProjectIdleDays >= 7 ? "is-overdue" : ""}`}><b>{selectedProjectIdleDays} <small>{dayWord(selectedProjectIdleDays)}</small></b><span>без продвижения</span></div></div>
         </section>
         <div className="project-dashboard-actions"><button type="button" onClick={() => onAddTask(selectedProject.id, null)}><Plus size={15} />Новая задача</button><button type="button" onClick={() => onOpenProjectTasks(selectedProject.id)}>Все задачи проекта <ArrowRight size={14} /></button></div>
         <div className="project-dashboard-section-head"><div><h3>Разделы проекта</h3><p>Разложи работу по направлениям</p></div><span>{(selectedProject.sections ?? []).length}</span></div>

@@ -708,10 +708,20 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .project-card-progress > div b { color: var(--project-color,#3d73ba); font-size: 14px; font-weight: 750; }
 .project-card-progress > i { display: block; overflow: hidden; height: 7px; margin-top: 8px; border-radius: 999px; background: #edf1f6; }
 .project-card-progress > i em { display: block; height: 100%; border-radius: inherit; background: var(--project-color,#549af2); transition: width 300ms cubic-bezier(.2,.75,.25,1); }
-.project-activity { display: grid; grid-template-columns: 9px 1fr; align-items: center; column-gap: 8px; row-gap: 3px; margin-top: 16px; padding: 11px 12px; border: 1px solid #e7edf4; border-radius: 13px; color: #586a81; background: #f8fafc; font-size: 11px; font-weight: 650; }
+.project-activity { display: grid; grid-template-columns: 9px 1fr auto; align-items: center; column-gap: 8px; row-gap: 6px; margin-top: 16px; padding: 15px; border: 1px solid #cbddf2; border-radius: 14px; color: #3e628b; background: #eff6ff; font-size: 12px; font-weight: 700; }
+.project-activity strong { grid-column:3; grid-row:1 / 3; display:flex; align-items:baseline; gap:5px; color:#315f96; font-size:29px; font-weight:780; line-height:1; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+.project-activity strong em { color:inherit; font-size:11px; font-style:normal; font-weight:650; letter-spacing:0; }
 .project-activity-dot { width: 8px; height: 8px; border-radius: 50%; background: #4fac86; box-shadow: 0 0 0 3px #4fac861a; }
-.project-activity small { grid-column: 2; color: #98a3b1; font-size: 9px; font-weight: 500; }
-.project-activity.needs-attention { border-color: #f0dfc3; color: #8a6531; background: #fffaf0; }
+.project-activity small { grid-column: 2; color: #62768d; font-size: 10px; font-weight: 500; line-height:1.4; }
+.project-activity.needs-attention { border-color: #ecd1a5; color: #825a23; background: #fff7e8; }
+.project-activity.needs-attention strong { color:#966018; }
+.project-activity.is-overdue { border-color:#ebc5be; color:#934c3f; background:#fff0eb; }
+.project-activity.is-overdue strong { color:#a64e3e; }
+.project-dashboard-metrics > .project-idle-metric { border-color:#e9cfaa; background:#fff5e5; }
+.project-dashboard-metrics > .project-idle-metric b { color:#946223; }
+.project-dashboard-metrics > .project-idle-metric small { font-size:11px; font-weight:600; }
+.project-dashboard-metrics > .project-idle-metric span { color:#826644; }
+.project-dashboard-metrics > .project-idle-metric.is-overdue { border-color:#ecc3bb; background:#fff0eb; }
 .project-activity.needs-attention .project-activity-dot { background: #e3a345; box-shadow: 0 0 0 3px #e3a34521; }
 .project-tasks-toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; margin-top: 13px; padding: 10px 2px 0; border-top: 1px solid #edf0f4; color: #4e6f96; font-size: 11px; font-weight: 680; text-align: left; }
 .project-tasks-toggle svg { transition: transform 180ms ease; }
